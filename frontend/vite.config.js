@@ -8,7 +8,7 @@ export default defineConfig({
     port:5173,
     proxy: {
       '/api': {
-        target: 'petlove-backend.vercel.app',
+        target: 'petlove-backend.vercel.app/api',
         changeOrigin: true,
       },
     },
