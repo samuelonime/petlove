@@ -4,6 +4,9 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
 const fileUpload = require('express-fileupload');
+const EscrowService = require('../services/escrowService.js');
+const ShippingService = require('../services/shippingService.js');
+const PaymentService = require('../services/paymentService.js');
 
 // Load environment variables
 dotenv.config();
