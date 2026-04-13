@@ -1,279 +1,107 @@
-const mongoose = require('mongoose');
+const db = require('../config/database');
 
-const systemSettingSchema = new mongoose.Schema({
-  key: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-    uppercase: true
-  },
-  
-  value: {
-    type: mongoose.Schema.Types.Mixed,
-    required: true
-  },
-  
-  dataType: {
-    type: String,
-    enum: ['string', 'number', 'boolean', 'array', 'object'],
-    required: true
-  },
-  
-  category: {
-    type: String,
-    required: true,
-    enum: [
-      'general',
-      'payment',
-      'shipping',
-      'commission',
-      'security',
-      'email',
-      'sms',
-      'notifications',
-      'appearance',
-      'seo',
-      'social',
-      'maintenance'
-    ],
-    default: 'general'
-  },
-  
-  displayName: {
-    type: String,
-    required: true
-  },
-  
-  description: String,
-  
-  validationRules: {
-    type: mongoose.Schema.Types.Mixed,
-    default: {}
-  },
-  
-  // Access control
-  isPublic: {
-    type: Boolean,
-    default: false
-  },
-  
-  isEditable: {
-    type: Boolean,
-    default: true
-  },
-  
-  requiresRestart: {
-    type: Boolean,
-    default: false
-  },
-  
-  // Audit
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Admin'
-  },
-  
-  updatedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Admin'
-  },
-  
-  // History
-  history: [{
-    value: mongoose.Schema.Types.Mixed,
-    changedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Admin'
-    },
-    changedAt: {
-      type: Date,
-      default: Date.now
-    },
-    reason: String
-  }],
-  
-  // Timestamps
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-}, {
-  timestamps: true
-});
+class SystemSetting {
+  static async create(settingData) {
+    const {
+      setting_key,
+      setting_value,
+      description,
+      is_public = false
+    } = settingData;
 
-// Indexes
-systemSettingSchema.index({ category: 1 });
-systemSettingSchema.index({ isPublic: 1 });
-systemSettingSchema.index({ updatedAt: -1 });
+    const [result] = await db.execute(
+      `INSERT INTO system_settings
+       (setting_key, setting_value, description, is_public)
+       VALUES (?, ?, ?, ?)`,
+      [setting_key, JSON.stringify(setting_value), description, is_public]
+    );
 
-// Methods
-systemSettingSchema.methods.addToHistory = function(adminId, reason) {
-  this.history.push({
-    value: this.value,
-    changedBy: adminId,
-    changedAt: new Date(),
-    reason
-  });
-  
-  // Keep only last 10 changes
-  if (this.history.length > 10) {
-    this.history = this.history.slice(-10);
+    return result.insertId;
   }
-  
-  return this.save();
-};
 
-systemSettingSchema.methods.validateValue = function(newValue) {
-  const rules = this.validationRules;
-  
-  if (!rules) return true;
-  
-  if (rules.required && (newValue === undefined || newValue === null || newValue === '')) {
-    throw new Error('Value is required');
-  }
-  
-  if (rules.min !== undefined && newValue < rules.min) {
-    throw new Error(`Value must be at least ${rules.min}`);
-  }
-  
-  if (rules.max !== undefined && newValue > rules.max) {
-    throw new Error(`Value must be at most ${rules.max}`);
-  }
-  
-  if (rules.minLength && newValue.length < rules.minLength) {
-    throw new Error(`Value must be at least ${rules.minLength} characters`);
-  }
-  
-  if (rules.maxLength && newValue.length > rules.maxLength) {
-    throw new Error(`Value must be at most ${rules.maxLength} characters`);
-  }
-  
-  if (rules.pattern && !new RegExp(rules.pattern).test(newValue)) {
-    throw new Error('Value does not match required pattern');
-  }
-  
-  if (rules.enum && !rules.enum.includes(newValue)) {
-    throw new Error(`Value must be one of: ${rules.enum.join(', ')}`);
-  }
-  
-  return true;
-};
+  static async getByKey(key) {
+    const [rows] = await db.execute(
+      'SELECT * FROM system_settings WHERE setting_key = ?',
+      [key]
+    );
 
-// Statics
-systemSettingSchema.statics.getByKey = function(key) {
-  return this.findOne({ key });
-};
-
-systemSettingSchema.statics.getByCategory = function(category) {
-  return this.find({ category });
-};
-
-systemSettingSchema.statics.getPublicSettings = function() {
-  return this.find({ isPublic: true });
-};
-
-systemSettingSchema.statics.initializeDefaults = async function() {
-  const defaults = [
-    {
-      key: 'SITE_NAME',
-      value: 'PetHub',
-      dataType: 'string',
-      category: 'general',
-      displayName: 'Site Name',
-      description: 'The name of your website',
-      isPublic: true,
-      validationRules: {
-        required: true,
-        minLength: 2,
-        maxLength: 100
-      }
-    },
-    {
-      key: 'SITE_URL',
-      value: 'https://pethub.ng',
-      dataType: 'string',
-      category: 'general',
-      displayName: 'Site URL',
-      description: 'The URL of your website',
-      isPublic: true,
-      validationRules: {
-        required: true,
-        pattern: '^https?://.+'
-      }
-    },
-    {
-      key: 'COMMISSION_RATE',
-      value: 10,
-      dataType: 'number',
-      category: 'commission',
-      displayName: 'Commission Rate',
-      description: 'Percentage commission charged on each order',
-      validationRules: {
-        required: true,
-        min: 0,
-        max: 50
-      }
-    },
-    {
-      key: 'ESCROW_RELEASE_DAYS',
-      value: 7,
-      dataType: 'number',
-      category: 'payment',
-      displayName: 'Escrow Release Days',
-      description: 'Number of days after delivery to auto-release escrow',
-      validationRules: {
-        required: true,
-        min: 1,
-        max: 30
-      }
-    },
-    {
-      key: 'MIN_ORDER_AMOUNT',
-      value: 1000,
-      dataType: 'number',
-      category: 'general',
-      displayName: 'Minimum Order Amount',
-      description: 'Minimum amount required to place an order',
-      validationRules: {
-        required: true,
-        min: 0
-      }
-    },
-    {
-      key: 'FREE_SHIPPING_THRESHOLD',
-      value: 5000,
-      dataType: 'number',
-      category: 'shipping',
-      displayName: 'Free Shipping Threshold',
-      description: 'Order amount required for free shipping',
-      isPublic: true,
-      validationRules: {
-        min: 0
-      }
-    },
-    {
-      key: 'MAINTENANCE_MODE',
-      value: false,
-      dataType: 'boolean',
-      category: 'maintenance',
-      displayName: 'Maintenance Mode',
-      description: 'Enable maintenance mode',
-      requiresRestart: false
+    if (rows[0]) {
+      rows[0].setting_value = JSON.parse(rows[0].setting_value);
     }
-  ];
-  
-  for (const defaultSetting of defaults) {
-    const existing = await this.findOne({ key: defaultSetting.key });
-    if (!existing) {
-      await this.create(defaultSetting);
+
+    return rows[0];
+  }
+
+  static async getAll() {
+    const [rows] = await db.execute(
+      'SELECT * FROM system_settings ORDER BY setting_key'
+    );
+
+    return rows.map(row => ({
+      ...row,
+      setting_value: JSON.parse(row.setting_value)
+    }));
+  }
+
+  static async getPublicSettings() {
+    const [rows] = await db.execute(
+      'SELECT * FROM system_settings WHERE is_public = TRUE ORDER BY setting_key'
+    );
+
+    return rows.map(row => ({
+      ...row,
+      setting_value: JSON.parse(row.setting_value)
+    }));
+  }
+
+  static async update(key, value, description = null) {
+    const updateFields = ['setting_value = ?'];
+    const params = [JSON.stringify(value)];
+
+    if (description !== null) {
+      updateFields.push('description = ?');
+      params.push(description);
+    }
+
+    params.push(key);
+
+    await db.execute(
+      `UPDATE system_settings SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE setting_key = ?`,
+      params
+    );
+  }
+
+  static async delete(key) {
+    await db.execute(
+      'DELETE FROM system_settings WHERE setting_key = ?',
+      [key]
+    );
+  }
+
+  // Initialize default settings
+  static async initializeDefaults() {
+    const defaults = [
+      { key: 'SITE_NAME', value: 'PetHub', description: 'The name of your website', public: true },
+      { key: 'SITE_URL', value: 'https://pethub.ng', description: 'The URL of your website', public: true },
+      { key: 'COMMISSION_RATE', value: 10, description: 'Percentage commission charged on each order', public: false },
+      { key: 'ESCROW_RELEASE_DAYS', value: 7, description: 'Number of days after delivery to auto-release escrow', public: false },
+      { key: 'MIN_ORDER_AMOUNT', value: 1000, description: 'Minimum amount required to place an order', public: false },
+      { key: 'FREE_SHIPPING_THRESHOLD', value: 5000, description: 'Order amount required for free shipping', public: true },
+      { key: 'MAINTENANCE_MODE', value: false, description: 'Enable maintenance mode', public: false }
+    ];
+
+    for (const setting of defaults) {
+      const existing = await this.getByKey(setting.key);
+      if (!existing) {
+        await this.create({
+          setting_key: setting.key,
+          setting_value: setting.value,
+          description: setting.description,
+          is_public: setting.public
+        });
+      }
     }
   }
-};
+}
 
-module.exports = mongoose.model('SystemSetting', systemSettingSchema);
+module.exports = SystemSetting;

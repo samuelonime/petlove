@@ -1,383 +1,195 @@
-const mongoose = require('mongoose');
+const db = require('../config/database');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const speakeasy = require('speakeasy');
 
-const adminSchema = new mongoose.Schema({
-  // Basic Information
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true,
-    trim: true,
-    validate: {
-      validator: function(v) {
-        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-      },
-      message: 'Please provide a valid email address'
-    }
-  },
-  
-  password: {
-    type: String,
-    required: true,
-    minlength: 12,
-    select: false
-  },
-  
-  passwordChangedAt: Date,
-  passwordResetToken: String,
-  passwordResetExpires: Date,
-  
-  // Personal Information
-  firstName: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  lastName: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  
-  // Contact Information
-  phone: {
-    type: String,
-    trim: true,
-    validate: {
-      validator: function(v) {
-        return /^\+?[\d\s\-\(\)]+$/.test(v);
-      },
-      message: 'Please provide a valid phone number'
-    }
-  },
-  
-  // Role & Permissions
-  role: {
-    type: String,
-    enum: ['admin', 'super_admin', 'moderator'],
-    default: 'admin'
-  },
-  
-  permissions: [{
-    type: String,
-    enum: [
-      // User Management
-      'users:read',
-      'users:create',
-      'users:update',
-      'users:delete',
-      
-      // Product Management
-      'products:read',
-      'products:create',
-      'products:update',
-      'products:delete',
-      
-      // Order Management
-      'orders:read',
-      'orders:update',
-      'orders:cancel',
-      
-      // Financial Management
-      'payments:read',
-      'transactions:read',
-      'escrow:read',
-      'escrow:release',
-      
-      // Seller Management
-      'sellers:read',
-      'sellers:verify',
-      'sellers:update',
-      'sellers:suspend',
-      
-      // Dispute Management
-      'disputes:read',
-      'disputes:resolve',
-      
-      // Analytics & Reports
-      'analytics:read',
-      'reports:generate',
-      
-      // System Settings
-      'settings:read',
-      'settings:update',
-      
-      // Security & Audit
-      'security:read',
-      'audit:read',
-      
-      // Admin Management
-      'admins:read',
-      'admins:create',
-      'admins:update',
-      'admins:delete',
-      
-      // Content Management
-      'content:read',
-      'content:create',
-      'content:update',
-      'content:delete'
-    ]
-  }],
-  
-  // Two-Factor Authentication
-  twoFactorEnabled: {
-    type: Boolean,
-    default: false
-  },
-  twoFactorSecret: {
-    type: String,
-    select: false
-  },
-  twoFactorBackupCodes: [{
-    type: String,
-    select: false
-  }],
-  
-  // Security Settings
-  lastLogin: Date,
-  loginAttempts: {
-    type: Number,
-    default: 0
-  },
-  lockUntil: Date,
-  
-  // Activity Tracking
-  lastActivity: Date,
-  loginCount: {
-    type: Number,
-    default: 0
-  },
-  
-  // Status
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  isVerified: {
-    type: Boolean,
-    default: false
-  },
-  
-  // Preferences
-  preferences: {
-    theme: {
-      type: String,
-      enum: ['light', 'dark', 'auto'],
-      default: 'light'
-    },
-    language: {
-      type: String,
-      default: 'en'
-    },
-    notifications: {
-      email: { type: Boolean, default: true },
-      push: { type: Boolean, default: true },
-      sms: { type: Boolean, default: false }
-    }
-  },
-  
-  // Metadata
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Admin'
-  },
-  
-  // Timestamps
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  },
-  deletedAt: Date
-}, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
-});
+class Admin {
+  static async create(adminData) {
+    const {
+      email,
+      password,
+      first_name,
+      last_name,
+      phone,
+      is_super_admin = false,
+      two_factor_enabled = false
+    } = adminData;
 
-// Indexes
-adminSchema.index({ role: 1 });
-adminSchema.index({ isActive: 1 });
-adminSchema.index({ createdAt: -1 });
-adminSchema.index({ 'permissions': 1 });
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-// Virtuals
-adminSchema.virtual('fullName').get(function() {
-  return `${this.firstName} ${this.lastName}`;
-});
-
-adminSchema.virtual('isLocked').get(function() {
-  return !!(this.lockUntil && this.lockUntil > Date.now());
-});
-
-// Middleware
-adminSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  
-  try {
-    // Hash password
-    const salt = await bcrypt.genSalt(12);
-    this.password = await bcrypt.hash(this.password, salt);
-    
-    // Set password changed timestamp
-    if (!this.isNew) {
-      this.passwordChangedAt = Date.now() - 1000;
-    }
-    
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
-
-adminSchema.pre('save', function(next) {
-  if (!this.isNew) {
-    this.updatedAt = Date.now();
-  }
-  next();
-});
-
-// Methods
-adminSchema.methods.comparePassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
-};
-
-adminSchema.methods.changedPasswordAfter = function(JWTTimestamp) {
-  if (this.passwordChangedAt) {
-    const changedTimestamp = parseInt(
-      this.passwordChangedAt.getTime() / 1000,
-      10
+    const [result] = await db.execute(
+      `INSERT INTO admins
+       (email, password, first_name, last_name, phone, is_super_admin, two_factor_enabled)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [email, hashedPassword, first_name, last_name, phone, is_super_admin, two_factor_enabled]
     );
-    return JWTTimestamp < changedTimestamp;
+
+    return result.insertId;
   }
-  return false;
-};
 
-adminSchema.methods.createPasswordResetToken = function() {
-  const resetToken = crypto.randomBytes(32).toString('hex');
-  
-  this.passwordResetToken = crypto
-    .createHash('sha256')
-    .update(resetToken)
-    .digest('hex');
-  
-  this.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
-  
-  return resetToken;
-};
+  static async findByEmail(email, includePassword = false) {
+    const fields = includePassword
+      ? 'id, email, password, first_name, last_name, phone, is_active, is_super_admin, two_factor_secret, two_factor_enabled, password_changed_at, password_reset_token, password_reset_expires, last_login, login_attempts, locked_until, created_at, updated_at'
+      : 'id, email, first_name, last_name, phone, is_active, is_super_admin, two_factor_enabled, last_login, created_at, updated_at';
 
-adminSchema.methods.incrementLoginAttempts = async function() {
-  // If we have a previous lock that has expired, restart at 1
-  if (this.lockUntil && this.lockUntil < Date.now()) {
-    return await this.updateOne({
-      $set: { loginAttempts: 1 },
-      $unset: { lockUntil: 1 }
+    const [rows] = await db.execute(
+      `SELECT ${fields} FROM admins WHERE email = ?`,
+      [email]
+    );
+
+    return rows[0];
+  }
+
+  static async findById(id, includePassword = false) {
+    const fields = includePassword
+      ? 'id, email, password, first_name, last_name, phone, is_active, is_super_admin, two_factor_secret, two_factor_enabled, password_changed_at, password_reset_token, password_reset_expires, last_login, login_attempts, locked_until, created_at, updated_at'
+      : 'id, email, first_name, last_name, phone, is_active, is_super_admin, two_factor_enabled, last_login, created_at, updated_at';
+
+    const [rows] = await db.execute(
+      `SELECT ${fields} FROM admins WHERE id = ?`,
+      [id]
+    );
+
+    return rows[0];
+  }
+
+  static async update(id, updateData) {
+    const fields = [];
+    const values = [];
+
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] !== undefined) {
+        fields.push(`${key} = ?`);
+        values.push(updateData[key]);
+      }
+    });
+
+    if (fields.length === 0) return;
+
+    values.push(id);
+
+    await db.execute(
+      `UPDATE admins SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      values
+    );
+  }
+
+  static async updatePassword(id, newPassword) {
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    await db.execute(
+      `UPDATE admins SET password = ?, password_changed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [hashedPassword, id]
+    );
+  }
+
+  static async incrementLoginAttempts(id) {
+    await db.execute(
+      `UPDATE admins SET login_attempts = login_attempts + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [id]
+    );
+
+    // Check if account should be locked
+    const [rows] = await db.execute(
+      'SELECT login_attempts FROM admins WHERE id = ?',
+      [id]
+    );
+
+    if (rows[0] && rows[0].login_attempts >= 5) {
+      await db.execute(
+        `UPDATE admins SET locked_until = DATE_ADD(NOW(), INTERVAL 30 MINUTE), updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [id]
+      );
+    }
+  }
+
+  static async resetLoginAttempts(id) {
+    await db.execute(
+      `UPDATE admins SET login_attempts = 0, locked_until = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [id]
+    );
+  }
+
+  static async updateLastLogin(id) {
+    await db.execute(
+      `UPDATE admins SET last_login = CURRENT_TIMESTAMP, login_attempts = 0, locked_until = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [id]
+    );
+  }
+
+  static async createPasswordResetToken(id) {
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    await db.execute(
+      `UPDATE admins SET password_reset_token = ?, password_reset_expires = DATE_ADD(NOW(), INTERVAL 10 MINUTE), updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [hashedToken, id]
+    );
+
+    return resetToken;
+  }
+
+  static async findByPasswordResetToken(token) {
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const [rows] = await db.execute(
+      'SELECT * FROM admins WHERE password_reset_token = ? AND password_reset_expires > NOW()',
+      [hashedToken]
+    );
+
+    return rows[0];
+  }
+
+  static async clearPasswordResetToken(id) {
+    await db.execute(
+      `UPDATE admins SET password_reset_token = NULL, password_reset_expires = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [id]
+    );
+  }
+
+  static async getAllAdmins() {
+    const [rows] = await db.execute(
+      'SELECT id, email, first_name, last_name, phone, is_active, is_super_admin, last_login, created_at FROM admins ORDER BY created_at DESC'
+    );
+
+    return rows;
+  }
+
+  static async getActiveAdmins() {
+    const [rows] = await db.execute(
+      'SELECT id, email, first_name, last_name, phone, is_super_admin, last_login FROM admins WHERE is_active = TRUE ORDER BY last_login DESC'
+    );
+
+    return rows;
+  }
+
+  // Instance methods (for compatibility with existing code)
+  static async comparePassword(password, hashedPassword) {
+    return await bcrypt.compare(password, hashedPassword);
+  }
+
+  static generate2FASecret(email) {
+    return speakeasy.generateSecret({
+      name: `PetHub Admin (${email})`
     });
   }
-  
-  // Otherwise increment
-  const updates = { $inc: { loginAttempts: 1 } };
-  
-  // Lock the account if we've reached max attempts
-  if (this.loginAttempts + 1 >= 5) {
-    updates.$set = { lockUntil: Date.now() + 30 * 60 * 1000 }; // 30 minutes
+
+  static verify2FAToken(secret, token) {
+    return speakeasy.totp.verify({
+      secret: secret,
+      encoding: 'base32',
+      token: token,
+      window: 1
+    });
   }
-  
-  return await this.updateOne(updates);
-};
 
-adminSchema.methods.resetLoginAttempts = function() {
-  return this.updateOne({
-    $set: { loginAttempts: 0 },
-    $unset: { lockUntil: 1 }
-  });
-};
-
-adminSchema.methods.generate2FASecret = function() {
-  const secret = speakeasy.generateSecret({
-    name: `PetHub (${this.email})`
-  });
-  
-  this.twoFactorSecret = secret.base32;
-  return secret;
-};
-
-adminSchema.methods.verify2FAToken = function(token) {
-  return speakeasy.totp.verify({
-    secret: this.twoFactorSecret,
-    encoding: 'base32',
-    token: token,
-    window: 1 // Allow 30 seconds before/after
-  });
-};
-
-adminSchema.methods.generateBackupCodes = function() {
-  const codes = [];
-  for (let i = 0; i < 10; i++) {
-    codes.push(crypto.randomBytes(4).toString('hex').toUpperCase());
-  }
-  
-  // Hash codes before storing
-  this.twoFactorBackupCodes = codes.map(code => 
-    crypto.createHash('sha256').update(code).digest('hex')
-  );
-  
-  return codes;
-};
-
-adminSchema.methods.verifyBackupCode = function(code) {
-  const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
-  const index = this.twoFactorBackupCodes.indexOf(hashedCode);
-  
-  if (index !== -1) {
-    // Remove used backup code
-    this.twoFactorBackupCodes.splice(index, 1);
-    return true;
-  }
-  
-  return false;
-};
-
-// Statics
-adminSchema.statics.findByEmail = function(email) {
-  return this.findOne({ email }).select('+password +twoFactorSecret');
-};
-
-adminSchema.statics.getAdminsWithPermissions = function(permission) {
-  return this.find({
-    isActive: true,
-    permissions: permission
-  });
-};
-
-adminSchema.statics.getAdminStats = async function() {
-  const stats = await this.aggregate([
-    {
-      $group: {
-        _id: '$role',
-        count: { $sum: 1 },
-        active: {
-          $sum: { $cond: [{ $eq: ['$isActive', true] }, 1, 0] }
-        }
-      }
-    },
-    {
-      $project: {
-        role: '$_id',
-        count: 1,
-        active: 1,
-        inactive: { $subtract: ['$count', '$active'] }
-      }
+  static generateBackupCodes() {
+    const codes = [];
+    for (let i = 0; i < 10; i++) {
+      codes.push(crypto.randomBytes(4).toString('hex').toUpperCase());
     }
-  ]);
-  
-  return stats;
-};
+    return codes;
+  }
+}
 
-module.exports = mongoose.model('Admin', adminSchema);
+module.exports = Admin;

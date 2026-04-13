@@ -8,6 +8,7 @@ const Order = require('../models/Order');
 const EscrowTransaction = require('../models/EscrowTransaction');
 const SystemSetting = require('../models/SystemSetting');
 const Review = require('../models/Review');
+const db = require('../config/database');
 
 // Add these utility imports
 const jwt = require('jsonwebtoken');
@@ -1028,6 +1029,122 @@ class AdminController {
         error: 'Failed to suspend seller',
         code: 'SELLER_SUSPEND_ERROR'
       });
+    }
+  }
+
+  /**
+   * Product management (admin)
+   */
+  static async getProducts(req, res) {
+    try {
+      const { search, category } = req.query;
+      const filters = {};
+      if (search) filters.search = search;
+      if (category) filters.category = category;
+
+      const products = await Product.getAll(filters);
+
+      await AdminLog.logAction({
+        adminId: req.user.id,
+        action: 'VIEW_PRODUCTS',
+        entityType: 'products',
+        entityId: null,
+        details: { filters },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        severity: 'low'
+      });
+
+      res.json({ success: true, data: products });
+    } catch (error) {
+      console.error('Get products error:', error);
+      res.status(500).json({ error: 'Failed to fetch products', code: 'PRODUCTS_FETCH_ERROR' });
+    }
+  }
+
+  static async approveProduct(req, res) {
+    try {
+      const { id } = req.params;
+
+      // Ensure products table has a status column; if not, try to add it (safe no-op if already exists)
+      try {
+        await db.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'pending'");
+      } catch (e) {
+        // Some MySQL versions don't support IF NOT EXISTS for columns; ignore error
+      }
+
+      await db.execute('UPDATE products SET status = ? WHERE id = ?', ['approved', id]);
+
+      await AdminLog.logAction({
+        adminId: req.user.id,
+        action: 'APPROVE_PRODUCT',
+        entityType: 'product',
+        entityId: id,
+        details: { productId: id },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        severity: 'medium'
+      });
+
+      res.json({ success: true, message: 'Product approved' });
+    } catch (error) {
+      console.error('Approve product error:', error);
+      res.status(500).json({ error: 'Failed to approve product', code: 'PRODUCT_APPROVE_ERROR' });
+    }
+  }
+
+  static async deleteProductAdmin(req, res) {
+    try {
+      const { id } = req.params;
+
+      const product = await Product.findById(id);
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found', code: 'PRODUCT_NOT_FOUND' });
+      }
+
+      await Product.delete(id);
+
+      await AdminLog.logAction({
+        adminId: req.user.id,
+        action: 'DELETE_PRODUCT',
+        entityType: 'product',
+        entityId: id,
+        details: { productId: id, productName: product.name },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        severity: 'high'
+      });
+
+      res.json({ success: true, message: 'Product deleted' });
+    } catch (error) {
+      console.error('Delete product error:', error);
+      res.status(500).json({ error: 'Failed to delete product', code: 'PRODUCT_DELETE_ERROR' });
+    }
+  }
+
+  /**
+   * Review management (admin)
+   */
+  static async deleteReview(req, res) {
+    try {
+      const { id } = req.params;
+      await db.execute('DELETE FROM reviews WHERE id = ?', [id]);
+
+      await AdminLog.logAction({
+        adminId: req.user.id,
+        action: 'DELETE_REVIEW',
+        entityType: 'review',
+        entityId: id,
+        details: { reviewId: id },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        severity: 'high'
+      });
+
+      res.json({ success: true, message: 'Review deleted' });
+    } catch (error) {
+      console.error('Delete review error:', error);
+      res.status(500).json({ error: 'Failed to delete review', code: 'REVIEW_DELETE_ERROR' });
     }
   }
   

@@ -3,23 +3,33 @@ const User = require('../models/User');
 
 const auth = async (req, res, next) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const authHeader = req.header('Authorization');
+    console.log('Authorization header:', authHeader);
+    
+    const token = authHeader?.replace('Bearer ', '');
+    console.log('Extracted token:', token ? `${token.substring(0, 20)}...` : 'null');
     
     if (!token) {
-      throw new Error();
+      console.warn('No token provided');
+      throw new Error('No token provided');
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('Token decoded successfully, user ID:', decoded.id);
+    
     const user = await User.findById(decoded.id);
+    console.log('User found from DB:', user?.email);
 
     if (!user) {
-      throw new Error();
+      console.warn('User not found in DB for ID:', decoded.id);
+      throw new Error('User not found');
     }
 
     req.user = user;
     req.token = token;
     next();
   } catch (error) {
+    console.error('Auth middleware error:', error.message);
     res.status(401).json({ error: 'Please authenticate.' });
   }
 };

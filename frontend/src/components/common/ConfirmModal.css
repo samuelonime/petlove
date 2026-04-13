@@ -1,0 +1,6 @@
+.cm-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999}
+.cm-modal{background:#fff;padding:16px;border-radius:8px;max-width:420px;width:90%;box-shadow:0 6px 20px rgba(0,0,0,0.2)}
+.cm-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+.cm-btn{padding:8px 12px;border-radius:6px;border:0;cursor:pointer}
+.cm-confirm{background:#1f8ef1;color:#fff}
+.cm-cancel{background:#eee;color:#333}

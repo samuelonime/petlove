@@ -1,217 +1,86 @@
-const mongoose = require('mongoose');
+const db = require('../config/database');
 const crypto = require('crypto');
 
-const adminSessionSchema = new mongoose.Schema({
-  adminId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Admin',
-    required: true,
-    index: true
-  },
-  
-  sessionId: {
-    type: String,
-    required: true,
-    unique: true,
-    default: () => crypto.randomBytes(16).toString('hex')
-  },
-  
-  // Authentication tokens
-  accessTokenHash: {
-    type: String,
-    required: true
-  },
-  
-  refreshTokenHash: {
-    type: String,
-    required: true
-  },
-  
-  // Device information
-  userAgent: String,
-  browser: String,
-  browserVersion: String,
-  os: String,
-  osVersion: String,
-  deviceType: {
-    type: String,
-    enum: ['desktop', 'mobile', 'tablet', 'unknown'],
-    default: 'unknown'
-  },
-  
-  // Location
-  ipAddress: String,
-  country: String,
-  city: String,
-  region: String,
-  
-  // Two-factor authentication
-  twoFactorVerified: {
-    type: Boolean,
-    default: false
-  },
-  
-  twoFactorMethod: {
-    type: String,
-    enum: ['authenticator', 'sms', 'email', 'backup_code'],
-    default: 'authenticator'
-  },
-  
-  // Security flags
-  isCompromised: {
-    type: Boolean,
-    default: false
-  },
-  
-  compromisedReason: String,
-  
-  // Activity tracking
-  lastActivity: {
-    type: Date,
-    default: Date.now
-  },
-  
-  loginTime: {
-    type: Date,
-    default: Date.now
-  },
-  
-  // Session expiry
-  expiresAt: {
-    type: Date,
-    required: true,
-    index: true
-  },
-  
-  // Session status
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  
-  revokedAt: Date,
-  revokedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Admin'
-  },
-  
-  revokedReason: String,
-  
-  // Metadata
-  metadata: {
-    type: mongoose.Schema.Types.Mixed,
-    default: {}
-  },
-  
-  // Timestamps
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  
-  updatedAt: {
-    type: Date,
-    default: Date.now
+class AdminSession {
+  static async create(sessionData) {
+    const {
+      admin_id,
+      session_token,
+      ip_address,
+      user_agent,
+      expires_at
+    } = sessionData;
+
+    const [result] = await db.execute(
+      `INSERT INTO admin_sessions
+       (admin_id, session_token, ip_address, user_agent, expires_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [admin_id, session_token, ip_address, user_agent, expires_at]
+    );
+
+    return result.insertId;
   }
-}, {
-  timestamps: true
-});
 
-// Indexes
-adminSessionSchema.index({ adminId: 1, isActive: 1 });
-adminSessionSchema.index({ accessTokenHash: 1 });
-adminSessionSchema.index({ refreshTokenHash: 1 });
-adminSessionSchema.index({ lastActivity: -1 });
-adminSessionSchema.index({ ipAddress: 1 });
+  static async findByToken(token) {
+    const [rows] = await db.execute(
+      `SELECT as.*, a.email, a.first_name, a.last_name
+       FROM admin_sessions as
+       JOIN admins a ON as.admin_id = a.id
+       WHERE as.session_token = ?
+       AND as.expires_at > NOW()
+       AND a.is_active = TRUE`,
+      [token]
+    );
 
-// Methods
-adminSessionSchema.methods.updateActivity = function() {
-  this.lastActivity = new Date();
-  return this.save();
-};
+    return rows[0];
+  }
 
-adminSessionSchema.methods.revoke = function(revokedBy = null, reason = 'Manual revocation') {
-  this.isActive = false;
-  this.revokedAt = new Date();
-  this.revokedBy = revokedBy;
-  this.revokedReason = reason;
-  return this.save();
-};
+  static async findByAdminId(adminId) {
+    const [rows] = await db.execute(
+      'SELECT * FROM admin_sessions WHERE admin_id = ? AND expires_at > NOW() ORDER BY created_at DESC',
+      [adminId]
+    );
 
-adminSessionSchema.methods.isExpired = function() {
-  return new Date() > this.expiresAt;
-};
+    return rows;
+  }
 
-adminSessionSchema.methods.markAsCompromised = function(reason) {
-  this.isCompromised = true;
-  this.compromisedReason = reason;
-  this.isActive = false;
-  return this.save();
-};
+  static async updateLastActivity(sessionId) {
+    await db.execute(
+      'UPDATE admin_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [sessionId]
+    );
+  }
 
-// Statics
-adminSessionSchema.statics.createSession = async function(adminId, sessionData) {
-  const session = new this({
-    adminId,
-    ...sessionData,
-    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-  });
-  
-  return await session.save();
-};
+  static async revokeSession(sessionId) {
+    await db.execute(
+      'UPDATE admin_sessions SET expires_at = NOW() WHERE id = ?',
+      [sessionId]
+    );
+  }
 
-adminSessionSchema.statics.findByTokenHash = function(tokenHash) {
-  return this.findOne({
-    $or: [
-      { accessTokenHash: tokenHash },
-      { refreshTokenHash: tokenHash }
-    ],
-    isActive: true,
-    expiresAt: { $gt: new Date() }
-  });
-};
+  static async revokeAllSessions(adminId) {
+    await db.execute(
+      'UPDATE admin_sessions SET expires_at = NOW() WHERE admin_id = ? AND expires_at > NOW()',
+      [adminId]
+    );
+  }
 
-adminSessionSchema.statics.getActiveSessions = function(adminId) {
-  return this.find({
-    adminId,
-    isActive: true,
-    expiresAt: { $gt: new Date() }
-  }).sort({ lastActivity: -1 });
-};
+  static async cleanupExpiredSessions() {
+    await db.execute('DELETE FROM admin_sessions WHERE expires_at <= NOW()');
+  }
 
-adminSessionSchema.statics.revokeAllSessions = function(adminId, revokedBy = null, reason = 'Security policy') {
-  return this.updateMany(
-    { adminId, isActive: true },
-    {
-      $set: {
-        isActive: false,
-        revokedAt: new Date(),
-        revokedBy,
-        revokedReason: reason
-      }
-    }
-  );
-};
+  static async getActiveSessionCount(adminId) {
+    const [rows] = await db.execute(
+      'SELECT COUNT(*) as count FROM admin_sessions WHERE admin_id = ? AND expires_at > NOW()',
+      [adminId]
+    );
 
-adminSessionSchema.statics.revokeSession = function(sessionId, revokedBy = null, reason = 'Manual revocation') {
-  return this.findOneAndUpdate(
-    { sessionId, isActive: true },
-    {
-      $set: {
-        isActive: false,
-        revokedAt: new Date(),
-        revokedBy,
-        revokedReason: reason
-      }
-    },
-    { new: true }
-  );
-};
+    return rows[0].count;
+  }
 
-adminSessionSchema.statics.cleanupExpiredSessions = function() {
-  return this.deleteMany({
-    expiresAt: { $lt: new Date() }
-  });
-};
+  static generateSessionToken() {
+    return crypto.randomBytes(32).toString('hex');
+  }
+}
 
-module.exports = mongoose.model('AdminSession', adminSessionSchema);
+module.exports = AdminSession;

@@ -91,7 +91,12 @@ class AuthController {
 
   static async getProfile(req, res) {
     try {
+      console.log('getProfile called with req.user:', req.user);
       const user = await User.findById(req.user.id);
+      console.log('User found:', user);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
       res.json({ user });
     } catch (error) {
       console.error('Get profile error:', error);

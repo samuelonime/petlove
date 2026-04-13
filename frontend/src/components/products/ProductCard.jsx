@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
-import { FaStar, FaShoppingCart } from 'react-icons/fa';
+import { FaStar, FaShoppingCart, FaHeart, FaEye, FaTruck } from 'react-icons/fa';
 import { formatCurrency } from '../../utils/formatters';
+import './ProductCard.css';
 
 const ProductCard = ({ product }) => {
   const { addToCart } = useCart();
+  const [wishlisted, setWishlisted] = useState(false);
+  const [quickView, setQuickView] = useState(false);
 
   const handleAddToCart = (e) => {
     e.preventDefault();
@@ -13,73 +16,140 @@ const ProductCard = ({ product }) => {
     addToCart(product);
   };
 
+  const toggleWishlist = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setWishlisted(!wishlisted);
+  };
+
+  const getStockLevel = (stock) => {
+    if (stock === 0) return { level: 'out', text: 'Out of Stock', dotClass: 'low' };
+    if (stock <= 10) return { level: 'low', text: `Low Stock (${stock})`, dotClass: 'low' };
+    if (stock <= 30) return { level: 'medium', text: `In Stock (${stock})`, dotClass: 'medium' };
+    return { level: 'high', text: `In Stock (${stock})`, dotClass: 'high' };
+  };
+
+  const getRatingStars = (rating = 3) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+    
+    for (let i = 1; i <= 5; i++) {
+      if (i <= fullStars) {
+        stars.push(<FaStar key={i} className="rating-star filled" />);
+      } else if (i === fullStars + 1 && hasHalfStar) {
+        stars.push(<FaStar key={i} className="rating-star half-filled" />);
+      } else {
+        stars.push(<FaStar key={i} className="rating-star" />);
+      }
+    }
+    return stars;
+  };
+
+  const stockInfo = getStockLevel(product.stock);
+  const discountPercentage = product.originalPrice 
+    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+    : null;
+
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-      <Link to={`/products/${product.id}`}>
-        <div className="h-48 overflow-hidden">
+    <div className="product-card-modern">
+      {/* Image Container */}
+      <div className="product-image-container">
+        <Link to={`/products/${product.id}`} className="block h-full">
           <img
             src={product.images?.[0] || '/placeholder.jpg'}
             alt={product.name}
-            className="w-full h-full object-cover hover:scale-105 transition-transform"
+            className="product-image"
           />
-        </div>
-      </Link>
-      
-      <div className="p-4">
-        <Link to={`/products/${product.id}`}>
-          <h3 className="font-semibold text-lg mb-2 hover:text-blue-600 line-clamp-1">
-            {product.name}
-          </h3>
         </Link>
-        
-        <div className="flex items-center mb-2">
-          <div className="flex text-yellow-400">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <FaStar
-                key={star}
-                className={star <= (product.rating || 3) ? 'fill-current' : 'fill-gray-300'}
-                size={16}
-              />
-            ))}
-          </div>
-          <span className="ml-2 text-sm text-gray-600">
-            ({product.review_count || 0})
-          </span>
+
+        {/* Badges */}
+        <div className="product-badge-container">
+          {product.isNew && <span className="product-badge badge-new">New</span>}
+          {discountPercentage && <span className="product-badge badge-sale">{discountPercentage}% OFF</span>}
+          {product.isHot && <span className="product-badge badge-hot">Hot</span>}
+          {product.express_shipping && <span className="product-badge badge-express">Express</span>}
         </div>
-        
-        <p className="text-gray-600 text-sm mb-3 line-clamp-2">
-          {product.description}
-        </p>
-        
-        <div className="flex justify-between items-center">
-          <div>
-            <span className="text-2xl font-bold text-blue-600">
-              {formatCurrency(product.price)}
-            </span>
-            {product.stock > 0 ? (
-              <p className="text-sm text-green-600">In Stock ({product.stock})</p>
-            ) : (
-              <p className="text-sm text-red-600">Out of Stock</p>
+
+        {/* Quick Actions */}
+        <div className="product-quick-actions">
+          <button
+            onClick={toggleWishlist}
+            className={`quick-action-btn wishlist ${wishlisted ? 'active' : ''}`}
+            aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          >
+            <FaHeart />
+          </button>
+          <button
+            onClick={() => setQuickView(true)}
+            className="quick-action-btn"
+            aria-label="Quick view"
+          >
+            <FaEye />
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="product-content">
+        {/* Title */}
+        <Link to={`/products/${product.id}`} className="product-title-link">
+          <h3 className="product-title">{product.name}</h3>
+        </Link>
+
+        {/* Rating */}
+        <div className="product-rating">
+          <div className="rating-stars">
+            {getRatingStars(product.rating)}
+          </div>
+          <span className="rating-count">({product.review_count || 0})</span>
+        </div>
+
+        {/* Description */}
+        <p className="product-description">{product.description}</p>
+
+        {/* Price & Stock */}
+        <div className="product-price-stock">
+          <div className="product-price">
+            <span className="price-current">{formatCurrency(product.price)}</span>
+            {product.originalPrice && (
+              <>
+                <span className="price-original">{formatCurrency(product.originalPrice)}</span>
+                {discountPercentage && (
+                  <span className="price-discount">Save {discountPercentage}%</span>
+                )}
+              </>
             )}
           </div>
           
+          <div className="product-stock">
+            <div className="stock-indicator">
+              <span className={`stock-dot ${stockInfo.dotClass}`}></span>
+              <span className={`stock-text ${stockInfo.level}`}>{stockInfo.text}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Cart Button */}
+        <div className="product-actions">
           <button
             onClick={handleAddToCart}
             disabled={product.stock === 0}
-            className={`flex items-center px-4 py-2 rounded-lg ${
-              product.stock === 0
-                ? 'bg-gray-300 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700 text-white'
-            }`}
+            className="add-to-cart-btn"
+            aria-label={`Add ${product.name} to cart`}
           >
-            <FaShoppingCart className="mr-2" />
-            Add
+            <FaShoppingCart className="cart-icon" />
+            <span className="btn-text">
+              {product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
+            </span>
           </button>
         </div>
-        
+
+        {/* Express Shipping */}
         {product.express_shipping && (
-          <div className="mt-2 inline-flex items-center px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
-            <span>🚚 Express Delivery Available</span>
+          <div className="express-shipping">
+            <FaTruck className="express-icon" />
+            <span>Express Delivery Available</span>
           </div>
         )}
       </div>

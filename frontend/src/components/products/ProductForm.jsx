@@ -4,7 +4,8 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import productService from '../../services/productService';
 import { toast } from 'react-toastify';
-import { FaUpload, FaTimes } from 'react-icons/fa';
+import { FaUpload, FaTimes, FaSpinner } from 'react-icons/fa';
+import './ProductForm.css'; // Import CSS file
 
 const schema = yup.object({
   name: yup.string().required('Product name is required'),
@@ -84,173 +85,210 @@ const ProductForm = ({ product = null, onSuccess }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-2xl mx-auto">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Product Name *
-          </label>
-          <input
-            type="text"
-            {...register('name')}
-            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-          {errors.name && (
-            <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Category *
-          </label>
-          <select
-            {...register('category')}
-            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="food">Food</option>
-            <option value="toys">Toys</option>
-            <option value="accessories">Accessories</option>
-            <option value="medicine">Medicine</option>
-          </select>
-          {errors.category && (
-            <p className="mt-1 text-sm text-red-600">{errors.category.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Price (₦) *
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            {...register('price')}
-            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-          {errors.price && (
-            <p className="mt-1 text-sm text-red-600">{errors.price.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Stock Quantity *
-          </label>
-          <input
-            type="number"
-            {...register('stock')}
-            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-          {errors.stock && (
-            <p className="mt-1 text-sm text-red-600">{errors.stock.message}</p>
-          )}
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Description *
-        </label>
-        <textarea
-          {...register('description')}
-          rows={4}
-          className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
-        {errors.description && (
-          <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>
-        )}
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Product Images
-        </label>
-        <div className="space-y-4">
-          {/* Existing Images */}
-          {images.length > 0 && (
-            <div className="flex flex-wrap gap-4 mb-4">
-              {images.map((img, index) => (
-                <div key={index} className="relative">
-                  <img
-                    src={img}
-                    alt={`Product ${index + 1}`}
-                    className="w-24 h-24 object-cover rounded-lg"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeExistingImage(index)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
-                  >
-                    <FaTimes size={12} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* New Image Previews */}
-          {imageFiles.length > 0 && (
-            <div className="flex flex-wrap gap-4 mb-4">
-              {imageFiles.map((img, index) => (
-                <div key={index} className="relative">
-                  <img
-                    src={img.preview}
-                    alt={`Upload ${index + 1}`}
-                    className="w-24 h-24 object-cover rounded-lg"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeImage(index)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
-                  >
-                    <FaTimes size={12} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Upload Button */}
-          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500">
-            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-              <FaUpload className="w-8 h-8 mb-4 text-gray-500" />
-              <p className="mb-2 text-sm text-gray-500">
-                <span className="font-semibold">Click to upload</span> or drag and drop
-              </p>
-              <p className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</p>
-            </div>
+    <div className="product-form-container">
+      <form onSubmit={handleSubmit(onSubmit)} className="product-form">
+        <div className="form-grid">
+          <div className="form-group">
+            <label className="form-label">
+              Product Name *
+            </label>
             <input
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="hidden"
+              type="text"
+              {...register('name')}
+              className={`form-input ${errors.name ? 'form-input-error' : ''}`}
+              placeholder="Enter product name"
             />
-          </label>
-          <p className="text-sm text-gray-500 mt-2">
-            Upload up to 5 images. First image will be the main display.
-          </p>
-        </div>
-      </div>
+            {errors.name && (
+              <p className="form-error">{errors.name.message}</p>
+            )}
+          </div>
 
-      <div className="flex justify-end space-x-4">
-        <button
-          type="button"
-          onClick={() => window.history.back()}
-          className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={loading}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? 'Saving...' : product ? 'Update Product' : 'Create Product'}
-        </button>
-      </div>
-    </form>
+          <div className="form-group">
+            <label className="form-label">
+              Category *
+            </label>
+            <select
+              {...register('category')}
+              className={`form-select ${errors.category ? 'form-select-error' : ''}`}
+            >
+              <option value="food">Food</option>
+              <option value="toys">Toys</option>
+              <option value="accessories">Accessories</option>
+              <option value="medicine">Medicine</option>
+              <option value="grooming">Grooming</option>
+              <option value="bedding">Bedding</option>
+            </select>
+            {errors.category && (
+              <p className="form-error">{errors.category.message}</p>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              Price (₦) *
+            </label>
+            <div className="price-input-container">
+              <span className="price-prefix">₦</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                {...register('price')}
+                className={`form-input price-input ${errors.price ? 'form-input-error' : ''}`}
+                placeholder="0.00"
+              />
+            </div>
+            {errors.price && (
+              <p className="form-error">{errors.price.message}</p>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              Stock Quantity *
+            </label>
+            <input
+              type="number"
+              min="0"
+              {...register('stock')}
+              className={`form-input ${errors.stock ? 'form-input-error' : ''}`}
+              placeholder="Enter quantity"
+            />
+            {errors.stock && (
+              <p className="form-error">{errors.stock.message}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">
+            Description *
+          </label>
+          <textarea
+            {...register('description')}
+            rows={5}
+            className={`form-textarea ${errors.description ? 'form-textarea-error' : ''}`}
+            placeholder="Describe your product in detail..."
+          />
+          {errors.description && (
+            <p className="form-error">{errors.description.message}</p>
+          )}
+          <div className="description-hint">
+            Include details about features, benefits, and usage instructions
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">
+            Product Images
+          </label>
+          <div className="images-section">
+            {/* Existing Images */}
+            {images.length > 0 && (
+              <div className="existing-images">
+                <h4 className="images-subtitle">Existing Images</h4>
+                <div className="images-grid">
+                  {images.map((img, index) => (
+                    <div key={index} className="image-preview-container">
+                      <img
+                        src={img}
+                        alt={`Product ${index + 1}`}
+                        className="image-preview"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeExistingImage(index)}
+                        className="image-remove-btn"
+                        aria-label="Remove image"
+                      >
+                        <FaTimes className="remove-icon" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* New Image Previews */}
+            {imageFiles.length > 0 && (
+              <div className="new-images">
+                <h4 className="images-subtitle">New Uploads</h4>
+                <div className="images-grid">
+                  {imageFiles.map((img, index) => (
+                    <div key={index} className="image-preview-container">
+                      <img
+                        src={img.preview}
+                        alt={`Upload ${index + 1}`}
+                        className="image-preview"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        className="image-remove-btn"
+                        aria-label="Remove image"
+                      >
+                        <FaTimes className="remove-icon" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Upload Area */}
+            <label className="upload-area">
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="upload-input"
+              />
+              <div className="upload-content">
+                <FaUpload className="upload-icon" />
+                <div className="upload-text">
+                  <p className="upload-title">Click to upload images</p>
+                  <p className="upload-subtitle">or drag and drop</p>
+                </div>
+                <p className="upload-hint">PNG, JPG, GIF up to 5MB each</p>
+              </div>
+            </label>
+            
+            <div className="images-info">
+              <p className="images-info-text">
+                <span className="images-info-important">Important:</span> Upload up to 5 images. 
+                The first image will be used as the main product display.
+              </p>
+              <div className="images-counter">
+                {images.length + imageFiles.length} / 5 images
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="form-actions">
+          <button
+            type="button"
+            onClick={() => window.history.back()}
+            className="btn btn-secondary"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className={`btn btn-primary ${loading ? 'btn-loading' : ''}`}
+          >
+            {loading ? (
+              <>
+                <FaSpinner className="spinner-icon" />
+                {product ? 'Updating...' : 'Creating...'}
+              </>
+            ) : product ? 'Update Product' : 'Create Product'}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 };
 

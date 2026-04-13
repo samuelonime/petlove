@@ -3,180 +3,176 @@ import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { formatCurrency } from '../utils/formatters';
 import { FaTrash, FaPlus, FaMinus, FaArrowRight } from 'react-icons/fa';
+import './CartPage.css';
 
 const CartPage = () => {
   const { cartItems, cartTotal, itemCount, updateQuantity, removeFromCart, clearCart } = useCart();
 
   if (cartItems.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto text-center py-12">
-        <div className="text-6xl mb-6">🛒</div>
-        <h1 className="text-3xl font-bold mb-4">Your cart is empty</h1>
-        <p className="text-gray-600 mb-8">
-          Looks like you haven't added any items to your cart yet.
-        </p>
-        <Link
-          to="/products"
-          className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Start Shopping
-          <FaArrowRight className="ml-2" />
-        </Link>
+      <div className="cart-page">
+        <div className="cart-empty">
+          <span className="cart-empty-icon">🛒</span>
+          <h1>Your cart is empty</h1>
+          <p>Looks like you haven't added any items to your cart yet.</p>
+          <Link to="/products" className="cart-shop-btn">
+            Start Shopping
+            <FaArrowRight />
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8">Shopping Cart ({itemCount} items)</h1>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="p-6">
-              <div className="space-y-6">
-                {cartItems.map(item => (
-                  <div key={item.id} className="flex items-center border-b pb-6">
-                    <div className="w-24 h-24 flex-shrink-0">
-                      <img
-                        src={item.images?.[0] || '/placeholder.jpg'}
-                        alt={item.name}
-                        className="w-full h-full object-cover rounded-lg"
-                      />
+    <div className="cart-page">
+      <div className="cart-page-inner">
+
+        {/* Header */}
+        <div className="cart-header">
+          <h1>Shopping Cart</h1>
+          <span className="cart-item-badge">{itemCount} {itemCount === 1 ? 'item' : 'items'}</span>
+        </div>
+
+        <div className="cart-layout">
+
+          {/* ── Items Column ── */}
+          <div className="cart-card cart-items-card">
+            <div className="cart-items-header">
+              <h2>Your Items</h2>
+              <button className="cart-clear-btn" onClick={clearCart}>
+                <FaTrash /> Clear all
+              </button>
+            </div>
+
+            <ul className="cart-items-list">
+              {cartItems.map(item => (
+                <li key={item.id} className="cart-item">
+
+                  {/* Image */}
+                  <div className="cart-item-image">
+                    <img
+                      src={item.images?.[0] || '/placeholder.jpg'}
+                      alt={item.name}
+                    />
+                  </div>
+
+                  {/* Body */}
+                  <div className="cart-item-body">
+                    <div className="cart-item-top">
+                      <Link to={`/products/${item.id}`} className="cart-item-name">
+                        {item.name}
+                      </Link>
+                      <span className="cart-item-unit-price">
+                        {formatCurrency(item.price)}
+                      </span>
                     </div>
-                    
-                    <div className="flex-1 ml-6">
-                      <div className="flex justify-between">
-                        <div>
-                          <h3 className="font-semibold text-lg hover:text-blue-600">
-                            <Link to={`/products/${item.id}`}>{item.name}</Link>
-                          </h3>
-                          <p className="text-gray-600 text-sm mt-1">
-                            Category: {item.category}
-                          </p>
-                          {item.stock <= 10 && item.stock > 0 && (
-                            <p className="text-yellow-600 text-sm">
-                              Only {item.stock} left in stock
-                            </p>
-                          )}
-                        </div>
-                        <p className="text-xl font-bold">{formatCurrency(item.price)}</p>
+
+                    <div className="cart-item-meta">
+                      {item.category && (
+                        <span className="cart-item-category">{item.category}</span>
+                      )}
+                      {item.stock <= 10 && item.stock > 0 && (
+                        <span className="cart-item-stock-warning">
+                          ⚡ Only {item.stock} left
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="cart-item-bottom">
+                      {/* Quantity controls */}
+                      <div className="cart-item-controls">
+                        <button
+                          className="qty-btn"
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          disabled={item.quantity <= 1}
+                          aria-label="Decrease quantity"
+                        >
+                          <FaMinus />
+                        </button>
+                        <span className="qty-value">{item.quantity}</span>
+                        <button
+                          className="qty-btn"
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          disabled={item.quantity >= item.stock}
+                          aria-label="Increase quantity"
+                        >
+                          <FaPlus />
+                        </button>
                       </div>
-                      
-                      <div className="flex justify-between items-center mt-4">
-                        <div className="flex items-center space-x-3">
-                          <button
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                            disabled={item.quantity <= 1}
-                            className={`p-1 rounded ${
-                              item.quantity <= 1
-                                ? 'text-gray-400 cursor-not-allowed'
-                                : 'hover:bg-gray-100'
-                            }`}
-                          >
-                            <FaMinus />
-                          </button>
-                          <span className="px-4 py-1 border rounded">{item.quantity}</span>
-                          <button
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                            disabled={item.quantity >= item.stock}
-                            className={`p-1 rounded ${
-                              item.quantity >= item.stock
-                                ? 'text-gray-400 cursor-not-allowed'
-                                : 'hover:bg-gray-100'
-                            }`}
-                          >
-                            <FaPlus />
-                          </button>
-                        </div>
-                        
-                        <div className="flex items-center space-x-4">
-                          <p className="text-lg font-semibold">
-                            {formatCurrency(item.price * item.quantity)}
-                          </p>
-                          <button
-                            onClick={() => removeFromCart(item.id)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
+
+                      <div className="cart-item-right">
+                        <span className="cart-item-subtotal">
+                          {formatCurrency(item.price * item.quantity)}
+                        </span>
+                        <button
+                          className="cart-item-remove"
+                          onClick={() => removeFromCart(item.id)}
+                          aria-label="Remove item"
+                        >
+                          <FaTrash />
+                        </button>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-              
-              <div className="mt-6 flex justify-between">
-                <button
-                  onClick={clearCart}
-                  className="text-red-600 hover:text-red-700 flex items-center"
-                >
-                  <FaTrash className="mr-2" />
-                  Clear Cart
-                </button>
-                <Link
-                  to="/products"
-                  className="text-blue-600 hover:text-blue-700"
-                >
-                  Continue Shopping
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Order Summary */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow-md p-6 sticky top-6">
-            <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
-            
-            <div className="space-y-4">
-              <div className="flex justify-between">
-                <span>Subtotal ({itemCount} items)</span>
-                <span className="font-semibold">{formatCurrency(cartTotal)}</span>
-              </div>
-              
-              <div className="flex justify-between text-sm text-gray-600">
-                <span>Shipping</span>
-                <span>Calculated at checkout</span>
-              </div>
-              
-              <div className="pt-4 border-t">
-                <div className="flex justify-between font-bold text-lg">
-                  <span>Total</span>
-                  <span>{formatCurrency(cartTotal)}</span>
-                </div>
-                <p className="text-sm text-gray-600 mt-2">
-                  * VAT included where applicable
-                </p>
-              </div>
-            </div>
-            
-            <div className="mt-6 space-y-4">
-              <Link
-                to="/checkout"
-                className="block w-full py-3 bg-blue-600 text-white text-center rounded-lg hover:bg-blue-700 font-semibold"
-              >
-                Proceed to Checkout
+
+                </li>
+              ))}
+            </ul>
+
+            <div className="cart-items-footer">
+              <Link to="/products" className="cart-continue-link">
+                ← Continue Shopping
               </Link>
-              
-              <div className="text-sm text-gray-600 space-y-2">
-                <p className="flex items-center">
-                  <span className="inline-block w-4 h-4 bg-green-500 rounded-full mr-2"></span>
-                  Secure checkout with escrow protection
-                </p>
-                <p className="flex items-center">
-                  <span className="inline-block w-4 h-4 bg-green-500 rounded-full mr-2"></span>
-                  Multiple shipping options available
-                </p>
-                <p className="flex items-center">
-                  <span className="inline-block w-4 h-4 bg-green-500 rounded-full mr-2"></span>
-                  Payment released only after delivery confirmation
-                </p>
+            </div>
+          </div>
+
+          {/* ── Summary Column ── */}
+          <div className="cart-card cart-summary-card">
+            <h2>Order Summary</h2>
+
+            <div className="summary-rows">
+              <div className="summary-row">
+                <span className="label">Subtotal ({itemCount} {itemCount === 1 ? 'item' : 'items'})</span>
+                <span className="value">{formatCurrency(cartTotal)}</span>
+              </div>
+              <div className="summary-row shipping">
+                <span className="label">Shipping</span>
+                <span className="value">Calculated at checkout</span>
+              </div>
+            </div>
+
+            <div className="summary-divider" />
+
+            <div className="summary-rows">
+              <div className="summary-row total">
+                <span className="label">Total</span>
+                <span className="value">{formatCurrency(cartTotal)}</span>
+              </div>
+            </div>
+            <p className="summary-vat-note">* VAT included where applicable</p>
+
+            <Link to="/checkout" className="checkout-btn">
+              Proceed to Checkout
+              <FaArrowRight className="checkout-btn-arrow" />
+            </Link>
+
+            <div className="cart-trust-badges">
+              <div className="trust-badge">
+                <span className="trust-badge-dot" />
+                Secure checkout with escrow protection
+              </div>
+              <div className="trust-badge">
+                <span className="trust-badge-dot" />
+                Multiple shipping options available
+              </div>
+              <div className="trust-badge">
+                <span className="trust-badge-dot" />
+                Payment released only after delivery confirmation
               </div>
             </div>
           </div>
+
         </div>
       </div>
     </div>

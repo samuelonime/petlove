@@ -34,9 +34,17 @@ router.get('/sellers', AdminController.getSellers);
 router.post('/sellers/:id/verify', require2FA, AdminController.verifySeller);
 router.post('/sellers/:id/suspend', require2FA, AdminController.suspendSeller);
 
+// ==================== PRODUCT MANAGEMENT (admin) ====================
+router.get('/products', AdminController.getProducts);
+router.post('/products/:id/approve', require2FA, AdminController.approveProduct);
+router.delete('/products/:id', require2FA, AdminController.deleteProductAdmin);
+
 // ==================== ORDER MANAGEMENT ====================
 router.get('/orders', AdminController.getOrders);
 router.put('/orders/:id/status', AdminController.updateOrderStatus);
+
+// Review management (admin)
+router.delete('/reviews/:id', require2FA, AdminController.deleteReview);
 
 // ==================== DISPUTE MANAGEMENT ====================
 router.get('/disputes', AdminController.getDisputes);

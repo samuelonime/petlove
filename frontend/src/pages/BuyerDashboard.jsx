@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -12,6 +12,10 @@ import './BuyerDashboard.css';
 const BuyerDashboard = () => {
   const { user } = useAuth();
   const { itemCount } = useCart();
+
+  // Add loading states
+  const [isLoading, setIsLoading] = useState(true);
+  
   
   // Fetch orders
   const { data: orders = [] } = useQuery(
@@ -25,6 +29,28 @@ const BuyerDashboard = () => {
     'featured-products',
     () => productService.getProducts({ limit: 6 })
   );
+
+  // Loading skeleton component
+  const LoadingSkeleton = () => (
+    <div className="loading-grid">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="loading-card">
+          <div className="skeleton-icon"></div>
+          <div className="skeleton-text"></div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Add this check
+  if (isLoading || ordersLoading) {
+    return (
+      <div className="buyer-dashboard">
+        <LoadingSkeleton />
+      </div>
+    );
+  }
+
 
   // Calculate stats
   const totalSpent = orders.reduce((sum, order) => sum + (order.total || 0), 0);

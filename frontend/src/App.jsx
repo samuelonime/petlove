@@ -32,6 +32,8 @@ function App() {
                   <Navigate to="/" />
                 ) : route.seller && user?.user_type !== 'seller' ? (
                   <Navigate to="/" />
+                ) : route.buyer && user?.user_type !== 'buyer' ? (
+                  <Navigate to="/" />
                 ) : (
                   <route.component />
                 )

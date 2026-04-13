@@ -1,6 +1,7 @@
 const Review = require('../models/Review');
 const Product = require('../models/Product');
 const User = require('../models/User');
+const db = require('../config/database');
 
 // @desc    Create a new review for a product
 // @route   POST /api/reviews/:productId
@@ -16,20 +17,23 @@ const createReview = async (req, res) => {
     if (!product) return res.status(404).json({ message: 'Product not found' });
 
     // Check if user already reviewed this product
-    const alreadyReviewed = await Review.findOne({ product: productId, user: userId });
-    if (alreadyReviewed) {
+    const [existingReview] = await db.execute(
+      'SELECT id FROM reviews WHERE product_id = ? AND user_id = ?',
+      [productId, userId]
+    );
+    if (existingReview.length > 0) {
       return res.status(400).json({ message: 'You have already reviewed this product' });
     }
 
     // Create review
-    const review = await Review.create({
-      product: productId,
-      user: userId,
+    const reviewId = await Review.create({
+      user_id: userId,
+      product_id: productId,
       rating,
       comment,
     });
 
-    res.status(201).json({ success: true, data: review });
+    res.status(201).json({ success: true, data: { id: reviewId, rating, comment } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server Error' });
@@ -42,8 +46,7 @@ const createReview = async (req, res) => {
 const getProductReviews = async (req, res) => {
   try {
     const productId = req.params.productId;
-    const reviews = await Review.find({ product: productId })
-      .populate('user', 'name email'); // optional: show user info
+    const reviews = await Review.findByProduct(productId);
     res.status(200).json({ success: true, data: reviews });
   } catch (err) {
     console.error(err);

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { formatCurrency } from '../utils/formatters';
 import api from '../services/api';
+import { FaArrowRight, FaLock } from 'react-icons/fa';
 import './CheckoutPage.css';
 
 const CheckoutPage = () => {
@@ -10,6 +11,7 @@ const CheckoutPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+
   const [shippingInfo, setShippingInfo] = useState({
     name: '',
     address: '',
@@ -32,20 +34,19 @@ const CheckoutPage = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    
+
     try {
       const res = await api.post('/orders/checkout', {
         shipping: shippingInfo,
         items: cartItems,
         total: cartTotal,
       });
-      
+
       if (res.data.paymentUrl) {
-        // Redirect to payment
         window.location.href = res.data.paymentUrl;
       } else {
         clearCart();
-        navigate(`/payment-callback?tx_ref=${res.data.reference}`);
+        navigate(`/payment/callback?tx_ref=${res.data.reference}`);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Checkout failed. Please try again.');
@@ -55,139 +56,180 @@ const CheckoutPage = () => {
     }
   };
 
-  if (cartItems.length === 0) {
-    return null;
-  }
+  if (cartItems.length === 0) return null;
 
   return (
-    <div className="max-w-6xl mx-auto py-12 px-4">
-      <h1 className="text-3xl font-bold mb-8">Checkout</h1>
+    <div className="checkout-page">
+      <div className="checkout-inner">
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
-          {error && (
-            <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-              {error}
-            </div>
-          )}
-          
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold mb-6">Shipping Information</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  placeholder="Enter your full name"
-                  value={shippingInfo.name}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Address
-                </label>
-                <input
-                  type="text"
-                  name="address"
-                  placeholder="Enter your address"
-                  value={shippingInfo.address}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    City
-                  </label>
-                  <input
-                    type="text"
-                    name="city"
-                    placeholder="Enter your city"
-                    value={shippingInfo.city}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Postal Code
-                  </label>
-                  <input
-                    type="text"
-                    name="postalCode"
-                    placeholder="Enter postal code"
-                    value={shippingInfo.postalCode}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-semibold mt-6"
-              >
-                {loading ? 'Processing...' : 'Proceed to Payment'}
-              </button>
-            </form>
+        {/* Header */}
+        <div className="checkout-header">
+          <h1>Checkout</h1>
+          <div className="checkout-breadcrumb">
+            <Link to="/products">Shop</Link>
+            <span className="checkout-breadcrumb-sep">›</span>
+            <Link to="/cart">Cart</Link>
+            <span className="checkout-breadcrumb-sep">›</span>
+            <span>Checkout</span>
           </div>
         </div>
 
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow-md p-6 sticky top-6">
-            <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
-            
-            <div className="space-y-4 mb-6 border-b pb-6">
+        <div className="checkout-layout">
+
+          {/* ── Left: Shipping Form ── */}
+          <div>
+            {error && (
+              <div className="checkout-error">
+                <span className="checkout-error-icon">⚠</span>
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div className="co-card shipping-card">
+              <div className="shipping-card-header">
+                <span className="shipping-step-badge">1</span>
+                <h2>Shipping Information</h2>
+              </div>
+
+              <div className="shipping-form-body">
+                <form onSubmit={handleSubmit}>
+
+                  <div className="form-group">
+                    <label className="form-label">Full Name</label>
+                    <input
+                      type="text"
+                      name="name"
+                      className="form-input"
+                      placeholder="e.g. Chidi Okonkwo"
+                      value={shippingInfo.name}
+                      onChange={handleChange}
+                      required
+                      autoComplete="name"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Street Address</label>
+                    <input
+                      type="text"
+                      name="address"
+                      className="form-input"
+                      placeholder="e.g. 14 Adeola Odeku Street"
+                      value={shippingInfo.address}
+                      onChange={handleChange}
+                      required
+                      autoComplete="street-address"
+                    />
+                  </div>
+
+                  <div className="form-row">
+                    <div>
+                      <label className="form-label">City</label>
+                      <input
+                        type="text"
+                        name="city"
+                        className="form-input"
+                        placeholder="e.g. Lagos"
+                        value={shippingInfo.city}
+                        onChange={handleChange}
+                        required
+                        autoComplete="address-level2"
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Postal Code</label>
+                      <input
+                        type="text"
+                        name="postalCode"
+                        className="form-input"
+                        placeholder="e.g. 101001"
+                        value={shippingInfo.postalCode}
+                        onChange={handleChange}
+                        required
+                        autoComplete="postal-code"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="checkout-submit-btn"
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <span className="btn-spinner" />
+                        Processing…
+                      </>
+                    ) : (
+                      <>
+                        Proceed to Payment
+                        <FaArrowRight className="btn-arrow" />
+                      </>
+                    )}
+                  </button>
+
+                  <div className="secure-strip">
+                    <FaLock className="secure-strip-icon" />
+                    Payments secured with 256-bit SSL encryption
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Right: Order Summary ── */}
+          <div className="co-card summary-card">
+            <div className="summary-card-header">
+              <span className="summary-step-badge">2</span>
+              <h2>Order Summary</h2>
+            </div>
+
+            {/* Item list */}
+            <div className="summary-items">
               {cartItems.map(item => (
-                <div key={item.id} className="flex justify-between text-sm">
-                  <span>{item.name} x {item.quantity}</span>
-                  <span>{formatCurrency(item.price * item.quantity)}</span>
+                <div key={item.id} className="summary-item">
+                  <span className="summary-item-name">
+                    {item.name}
+                    <span className="summary-item-qty">×{item.quantity}</span>
+                  </span>
+                  <span className="summary-item-price">
+                    {formatCurrency(item.price * item.quantity)}
+                  </span>
                 </div>
               ))}
             </div>
 
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span className="font-semibold">{formatCurrency(cartTotal)}</span>
+            {/* Totals */}
+            <div className="summary-totals">
+              <div className="summary-row">
+                <span className="row-label">Subtotal</span>
+                <span className="row-value">{formatCurrency(cartTotal)}</span>
               </div>
-              <div className="flex justify-between text-sm text-gray-600">
-                <span>Shipping</span>
-                <span>Calculated at delivery</span>
+              <div className="summary-row shipping">
+                <span className="row-label">Shipping</span>
+                <span className="row-value">Calculated at delivery</span>
               </div>
-              <div className="pt-3 border-t">
-                <div className="flex justify-between font-bold text-lg">
-                  <span>Total</span>
-                  <span>{formatCurrency(cartTotal)}</span>
-                </div>
+              <div className="summary-divider" />
+              <div className="summary-row total-row">
+                <span className="row-label">Total</span>
+                <span className="row-value">{formatCurrency(cartTotal)}</span>
               </div>
             </div>
 
-            <div className="mt-6 text-sm text-gray-600 space-y-2">
-              <p className="flex items-center">
-                <span className="inline-block w-4 h-4 bg-green-500 rounded-full mr-2"></span>
+            {/* Trust badges */}
+            <div className="summary-trust">
+              <div className="trust-row">
+                <span className="trust-dot" />
                 Secure payment with escrow protection
-              </p>
-              <p className="flex items-center">
-                <span className="inline-block w-4 h-4 bg-green-500 rounded-full mr-2"></span>
-                Money released only after delivery
-              </p>
+              </div>
+              <div className="trust-row">
+                <span className="trust-dot" />
+                Money released only after confirmed delivery
+              </div>
             </div>
           </div>
+
         </div>
       </div>
     </div>

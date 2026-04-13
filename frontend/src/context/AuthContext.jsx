@@ -27,6 +27,9 @@ export const AuthProvider = ({ children }) => {
       setUser(userData);
     } catch (error) {
       console.error('Failed to load user:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      console.error('Full error object:', error);
       logout();
     } finally {
       setLoading(false);
