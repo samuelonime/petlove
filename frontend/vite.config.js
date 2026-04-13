@@ -8,7 +8,7 @@ export default defineConfig({
     port:5173,
     proxy: {
       '/api': {
-        target: 'https://petlove-production-53ae.up.railway.app/',
+        target: 'https://petlove-production-53ae.up.railway.app',
         changeOrigin: true,
       },
     },
