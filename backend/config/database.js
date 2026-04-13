@@ -3,16 +3,18 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-// Use environment variables for security
+// Railway detection
+const isRailway = process.env.RAILWAY_ENVIRONMENT === 'production' || process.env.MYSQLHOST;
+
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost', // default to localhost
-  user: process.env.DB_USER || 'root',      // default XAMPP user
-  password: process.env.DB_PASSWORD || '',  // default empty for XAMPP
-  database: process.env.DB_NAME || 'pethub',
+  host: isRailway ? process.env.MYSQLHOST : process.env.DB_HOST,
+  port: isRailway ? process.env.MYSQLPORT : 3306,
+  user: isRailway ? process.env.MYSQLUSER : process.env.DB_USER,
+  password: isRailway ? process.env.MYSQLPASSWORD : process.env.DB_PASSWORD,
+  database: isRailway ? process.env.MYSQLDATABASE : process.env.DB_NAME, // Note: DB_NAME is 'pethub_db'
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
 });
 
-// Export a promise-based pool for async/await
 module.exports = pool.promise();
