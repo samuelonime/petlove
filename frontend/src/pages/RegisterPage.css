@@ -183,6 +183,8 @@
   box-sizing: border-box;
   transition: border-color 0.18s var(--rg-ease), background 0.18s var(--rg-ease), box-shadow 0.18s var(--rg-ease);
   -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
 }
 .form-input::placeholder { color: var(--rg-ink-ghost); font-weight: 300; }
 .form-input:hover:not(:focus) { border-color: #b6c4d8; }
