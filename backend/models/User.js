@@ -1,4 +1,6 @@
-const db = require('../config/database');
+const db = require('../config/database
+
+// force deploy
 
 class User {
   static async create(userData) {
