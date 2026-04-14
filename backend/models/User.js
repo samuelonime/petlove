@@ -2,7 +2,8 @@ const db = require('../config/database');
 
 class User {
   static async create(userData) {
-    const { name, email, phone, password, user_type } = userData;
+    const { name, email, password, user_type } = userData;
+    const phone = userData.phone || null;
     const [result] = await db.execute(
       'INSERT INTO users (name, email, phone, password, user_type) VALUES (?, ?, ?, ?, ?)',
       [name, email, phone, password, user_type]
@@ -30,7 +31,7 @@ class User {
     const { name, phone } = userData;
     await db.execute(
       'UPDATE users SET name = ?, phone = ? WHERE id = ?',
-      [name, phone, id]
+      [name, phone || null, id]
     );
   }
 
