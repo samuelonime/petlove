@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
-    port:petlove-liart.vercel.app/,
+    port:5000,
     proxy: {
       '/api': {
         target: 'petlove-production-53ae.up.railway.app',
