@@ -69,7 +69,7 @@ const AdminPage = () => {
   async function fetchUsers() {
     setUsersLoading(true); setUsersError(null);
     try {
-      const res  = await api.get('/admin/users');
+      const res  = await api.get('/api/admin/users');
       const data = res.data?.data?.users || res.data?.users || res.data;
       setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -95,7 +95,7 @@ const AdminPage = () => {
       message: 'This will permanently delete the user and all their data. This action cannot be undone.',
       onConfirm: async () => {
         try {
-          await api.delete(`/admin/users/${id}`);
+          await api.delete(`/api/admin/users/${id}`);
           setUsers(prev => prev.filter(u => u.id !== id && u._id !== id));
           toast.success('User removed');
         } catch (err) {
@@ -299,7 +299,7 @@ const AdminPage = () => {
                             <div className="action-buttons">
                               <button
                                 className="act-btn act-btn-details"
-                                onClick={() => navigate(`/admin/users/${u.id || u._id}`)}
+                                onClick={() => navigate(`/api/admin/users/${u.id || u._id}`)}
                               >
                                 <FaEye /> Details
                               </button>
