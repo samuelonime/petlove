@@ -481,87 +481,65 @@ class AdminController {
    * User Management
    */
   static async getUsers(req, res) {
-  try {
-    let {
-      page = 1,
-      limit = 20,
-      search = "",
-      role,
-      status,
-      sortBy = "created_at",
-      sortOrder = "DESC"
-    } = req.query;
+    try {
+      let {
+        page = 1,
+        limit = 20,
+        search = "",
+        role,
+        status,
+        sortBy = "created_at",
+        sortOrder = "DESC"
+      } = req.query;
 
-    const offset = (page - 1) * limit;
+      const offset = (page - 1) * limit;
 
-    // Base query
-    let sql = `
-      SELECT id, first_name, last_name, email, phone, role, status, created_at
-      FROM users
-      WHERE 1 = 1
-    `;
+      // Base query
+      let sql = `
+        SELECT id, first_name, last_name, email, phone, role, status, created_at
+        FROM users
+        WHERE 1 = 1
+      `;
 
-    const params = [];
+      const params = [];
 
-    // Search filter
-    if (search) {
-      sql += ` AND (email LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR phone LIKE ?)`;
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
-    }
-
-    // Role filter
-    if (role) {
-      sql += ` AND role = ?`;
-      params.push(role);
-    }
-
-    // Status filter
-    if (status) {
-      sql += ` AND status = ?`;
-      params.push(status);
-    }
-
-    // Sorting
-    sql += ` ORDER BY ${sortBy} ${sortOrder}`;
-
-    // Pagination
-    sql += ` LIMIT ? OFFSET ?`;
-    params.push(Number(limit), Number(offset));
-
-    // Fetch users
-    const [users] = await db.query(sql, params);
-
-    // Get total count
-    const [countResult] = await db.query(`SELECT COUNT(*) AS total FROM users`);
-    const total = countResult[0].total;
-
-    return res.json({
-      success: true,
-      data: {
-        users,
-        pagination: {
-          page: Number(page),
-          limit: Number(limit),
-          total,
-          totalPages: Math.ceil(total / limit)
-        }
+      // Search filter
+      if (search) {
+        sql += ` AND (email LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR phone LIKE ?)`;
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
       }
-    });
 
-  } catch (error) {
-    console.error("GET USERS ERROR:", error);
-    return res.status(500).json({
-      error: "Failed to fetch users",
-      message: error.message
-    });
-  }
-}
-      
+      // Role filter
+      if (role) {
+        sql += ` AND role = ?`;
+        params.push(role);
+      }
+
+      // Status filter
+      if (status) {
+        sql += ` AND status = ?`;
+        params.push(status);
+      }
+
+      // Sorting
+      sql += ` ORDER BY ${sortBy} ${sortOrder}`;
+
+      // Pagination
+      sql += ` LIMIT ? OFFSET ?`;
+      params.push(Number(limit), Number(offset));
+
+      // Fetch users
+      const [users] = await db.query(sql, params);
+
+      // Get total count
+      const [countResult] = await db.query(`SELECT COUNT(*) AS total FROM users`);
+      const total = countResult[0].total;
+
       // Get statistics
       const stats = await User.aggregate([
         { $group: { _id: '$accountStatus', count: { $sum: 1 } } }
       ]);
-      
+
       // Log this action to AdminLog
       await AdminLog.logAction({
         adminId: req.user.id,
@@ -578,7 +556,7 @@ class AdminController {
         userAgent: req.headers['user-agent'],
         severity: 'low'
       });
-      
+
       res.json({
         success: true,
         data: {
