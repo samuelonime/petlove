@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   FaEye, FaEyeSlash,
-  FaUser, FaEnvelope, FaLock, FaUserTag, FaCheckCircle
+  FaUser, FaEnvelope, FaLock, FaUserTag, FaPhone, FaCheckCircle
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import './RegisterPage.css';
@@ -13,6 +13,7 @@ const RegisterPage = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     password: '',
     confirmPassword: '',
     user_type: 'buyer',
@@ -57,6 +58,11 @@ const RegisterPage = () => {
     if (!formData.name.trim())                               { setError('Name is required'); return false; }
     if (!formData.email.trim())                              { setError('Email is required'); return false; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) { setError('Invalid email format'); return false; }
+    if (!formData.phone.trim())                              { setError('Phone number is required'); return false; }
+    if (!/^(\+?234|0)[789]\d{9}$/.test(formData.phone.replace(/\s+/g, ''))) {
+      setError('Enter a valid Nigerian phone number (e.g. 08012345678)');
+      return false;
+    }
     if (!formData.password)                                  { setError('Password is required'); return false; }
     if (formData.password.length < 6)                       { setError('Password must be at least 6 characters'); return false; }
     if (passwordStrength.score < 2)                         { setError('Please use a stronger password'); return false; }
@@ -71,9 +77,10 @@ const RegisterPage = () => {
     setLoading(true);
     try {
       const result = await register({
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
+        name:      formData.name,
+        email:     formData.email,
+        phone:     formData.phone,
+        password:  formData.password,
         user_type: formData.user_type,
       });
       if (!result.success) setError(result.error || 'Registration failed');
@@ -88,7 +95,7 @@ const RegisterPage = () => {
     <div className="register-page">
       <div className="register-container">
 
-        {/* ── LEFT: Form ───────────────────────────────────── */}
+        {/* ── LEFT: Form ── */}
         <div className="register-card">
           <div className="register-header">
             <h1>Join <span>PetHub</span></h1>
@@ -121,6 +128,17 @@ const RegisterPage = () => {
               />
             </div>
 
+            {/* Phone */}
+            <div className="form-group">
+              <label htmlFor="phone" className="form-label"><FaPhone /> Phone Number</label>
+              <input
+                type="tel" id="phone" name="phone"
+                value={formData.phone} onChange={handleChange}
+                placeholder="e.g. 08012345678"
+                className="form-input" disabled={loading} autoComplete="tel"
+              />
+            </div>
+
             {/* Password */}
             <div className="form-group">
               <label htmlFor="password" className="form-label"><FaLock /> Password</label>
@@ -131,7 +149,8 @@ const RegisterPage = () => {
                   placeholder="Minimum 6 characters"
                   className="form-input" disabled={loading} autoComplete="new-password"
                 />
-                <button type="button" className="password-toggle" onClick={() => setShowPassword(p => !p)}
+                <button type="button" className="password-toggle"
+                  onClick={() => setShowPassword(p => !p)}
                   disabled={loading} aria-label={showPassword ? 'Hide' : 'Show'}>
                   {showPassword ? <FaEyeSlash /> : <FaEye />}
                 </button>
@@ -156,7 +175,8 @@ const RegisterPage = () => {
                   placeholder="Re-enter your password"
                   className="form-input" disabled={loading} autoComplete="new-password"
                 />
-                <button type="button" className="password-toggle" onClick={() => setShowConfirmPassword(p => !p)}
+                <button type="button" className="password-toggle"
+                  onClick={() => setShowConfirmPassword(p => !p)}
                   disabled={loading} aria-label={showConfirmPassword ? 'Hide' : 'Show'}>
                   {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
                 </button>
@@ -213,7 +233,7 @@ const RegisterPage = () => {
           </div>
         </div>
 
-        {/* ── RIGHT: Brand Panel ───────────────────────────── */}
+        {/* ── RIGHT: Brand Panel ── */}
         <div className="register-info">
           <div className="register-info-grid" />
           <div className="info-card">
