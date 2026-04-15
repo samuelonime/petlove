@@ -69,7 +69,7 @@ const AdminPage = () => {
   async function fetchUsers() {
     setUsersLoading(true); setUsersError(null);
     try {
-      const res  = await api.get('/api/admin/users');
+      const res  = await api.get('/api/users');
       const data = res.data?.data?.users || res.data?.users || res.data;
       setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -95,7 +95,7 @@ const AdminPage = () => {
       message: 'This will permanently delete the user and all their data. This action cannot be undone.',
       onConfirm: async () => {
         try {
-          await api.delete(`/api/admin/users/${id}`);
+          await api.delete(`/api/users/${id}`);
           setUsers(prev => prev.filter(u => u.id !== id && u._id !== id));
           toast.success('User removed');
         } catch (err) {
