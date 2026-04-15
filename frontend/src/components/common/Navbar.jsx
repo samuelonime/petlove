@@ -83,10 +83,10 @@ const Navbar = () => {
           <div className="navbar-desktop">
             <div className="navbar-links">
               <Link to="/" className="navbar-link">Home</Link>
-              <Link to="/products" className="navbar-link">Products</Link>
-              <Link to="/products?category=food" className="navbar-link">Food</Link>
-              <Link to="/products?category=toys" className="navbar-link">Toys</Link>
-              <Link to="/products?category=medicine" className="navbar-link">Medicine</Link>
+              <Link to="/api/products" className="navbar-link">Products</Link>
+              <Link to="/api/products?category=food" className="navbar-link">Food</Link>
+              <Link to="/api/products?category=toys" className="navbar-link">Toys</Link>
+              <Link to="/api/products?category=medicine" className="navbar-link">Medicine</Link>
             </div>
             {userLinks}
           </div>
