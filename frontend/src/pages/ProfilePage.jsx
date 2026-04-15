@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import './ProfilePage.css';
 import { FaSync, FaUser, FaEnvelope, FaUserTag, FaCalendarAlt, FaMapMarkerAlt, FaPhone } from 'react-icons/fa';
+import './ProfilePage.css';
 
 const ProfilePage = () => {
   const { user } = useAuth();
