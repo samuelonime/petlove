@@ -481,53 +481,81 @@ class AdminController {
    * User Management
    */
   static async getUsers(req, res) {
-    try {
-      const {
-        page = 1,
-        limit = 20,
-        search,
-        role,
-        status,
-        sortBy = 'createdAt',
-        sortOrder = 'desc'
-      } = req.query;
-      
-      const skip = (page - 1) * limit;
-      const query = {};
-      
-      // Search filter
-      if (search) {
-        query.$or = [
-          { email: { $regex: search, $options: 'i' } },
-          { firstName: { $regex: search, $options: 'i' } },
-          { lastName: { $regex: search, $options: 'i' } },
-          { phone: { $regex: search, $options: 'i' } }
-        ];
+  try {
+    let {
+      page = 1,
+      limit = 20,
+      search = "",
+      role,
+      status,
+      sortBy = "created_at",
+      sortOrder = "DESC"
+    } = req.query;
+
+    const offset = (page - 1) * limit;
+
+    // Base query
+    let sql = `
+      SELECT id, first_name, last_name, email, phone, role, status, created_at
+      FROM users
+      WHERE 1 = 1
+    `;
+
+    const params = [];
+
+    // Search filter
+    if (search) {
+      sql += ` AND (email LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR phone LIKE ?)`;
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+    }
+
+    // Role filter
+    if (role) {
+      sql += ` AND role = ?`;
+      params.push(role);
+    }
+
+    // Status filter
+    if (status) {
+      sql += ` AND status = ?`;
+      params.push(status);
+    }
+
+    // Sorting
+    sql += ` ORDER BY ${sortBy} ${sortOrder}`;
+
+    // Pagination
+    sql += ` LIMIT ? OFFSET ?`;
+    params.push(Number(limit), Number(offset));
+
+    // Fetch users
+    const [users] = await db.query(sql, params);
+
+    // Get total count
+    const [countResult] = await db.query(`SELECT COUNT(*) AS total FROM users`);
+    const total = countResult[0].total;
+
+    return res.json({
+      success: true,
+      data: {
+        users,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
       }
-      
-      // Role filter
-      if (role) {
-        query.role = role;
-      }
-      
-      // Status filter
-      if (status) {
-        query.accountStatus = status;
-      }
-      
-      // Build sort
-      const sort = {};
-      sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
-      
-      // Get users
-      const users = await User.find(query)
-        .select('-password -passwordResetToken -passwordResetExpires')
-        .skip(skip)
-        .limit(parseInt(limit))
-        .sort(sort);
-      
-      // Get total count
-      const total = await User.countDocuments(query);
+    });
+
+  } catch (error) {
+    console.error("GET USERS ERROR:", error);
+    return res.status(500).json({
+      error: "Failed to fetch users",
+      message: error.message
+    });
+  }
+}
       
       // Get statistics
       const stats = await User.aggregate([
