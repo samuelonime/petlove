@@ -80,7 +80,7 @@ const AdminPage = () => {
   async function fetchProducts() {
     setProductsLoading(true); setProductsError(null);
     try {
-      const res  = await api.get('/products');
+      const res  = await api.get('/api/products');
       const data = res.data?.data || res.data || [];
       setProducts(Array.isArray(data) ? data : data.products || []);
     } catch (err) {
@@ -112,7 +112,7 @@ const AdminPage = () => {
       message: 'Delete this product permanently? Buyers will no longer be able to find or purchase it.',
       onConfirm: async () => {
         try {
-          await api.delete(`/products/${id}`);
+          await api.delete(`/api/products/${id}`);
           setProducts(prev => prev.filter(p => p.id !== id && p._id !== id));
           toast.success('Product deleted');
         } catch (err) {
