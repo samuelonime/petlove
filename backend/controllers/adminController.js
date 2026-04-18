@@ -270,6 +270,196 @@ class AdminController {
   }
 }
 
+static async updateUser(req, res) {
+  const { id } = req.params;
+  const { first_name, last_name, email, status } = req.body;
+
+  await db.execute(
+    `UPDATE users SET first_name=?, last_name=?, email=?, status=? WHERE id=?`,
+    [first_name, last_name, email, status, id]
+  );
+
+  res.json({ success: true, message: 'User updated' });
+}
+
+static async deleteUser(req, res) {
+  const { id } = req.params;
+
+  await db.execute(`DELETE FROM users WHERE id=?`, [id]);
+
+  res.json({ success: true, message: 'User deleted' });
+}
+
+static async getSellers(req, res) {
+  const [rows] = await db.query(`SELECT * FROM sellers ORDER BY created_at DESC`);
+  res.json({ success: true, data: rows });
+}
+
+static async verifySeller(req, res) {
+  const { id } = req.params;
+
+  await db.execute(
+    `UPDATE sellers SET is_verified=1 WHERE id=?`,
+    [id]
+  );
+
+  res.json({ success: true, message: 'Seller verified' });
+}
+
+static async suspendSeller(req, res) {
+  const { id } = req.params;
+
+  await db.execute(
+    `UPDATE sellers SET status='suspended' WHERE id=?`,
+    [id]
+  );
+
+  res.json({ success: true, message: 'Seller suspended' });
+}
+
+static async getProducts(req, res) {
+  const [rows] = await db.query(`SELECT * FROM products ORDER BY created_at DESC`);
+  res.json({ success: true, data: rows });
+}
+
+static async deleteProductAdmin(req, res) {
+  const { id } = req.params;
+
+  await db.execute(`DELETE FROM products WHERE id=?`, [id]);
+
+  res.json({ success: true, message: 'Product deleted' });
+}
+
+static async approveProduct(req, res) {
+  const { id } = req.params;
+
+  await db.execute(
+    `UPDATE products SET status='approved' WHERE id=?`,
+    [id]
+  );
+
+  res.json({ success: true, message: 'Product approved' });
+}
+
+static async getOrders(req, res) {
+  const [rows] = await db.query(`
+    SELECT o.*, u.email 
+    FROM orders o
+    LEFT JOIN users u ON o.buyer_id = u.id
+    ORDER BY o.created_at DESC
+  `);
+
+  res.json({ success: true, data: rows });
+}
+
+static async updateOrderStatus(req, res) {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  await db.execute(
+    `UPDATE orders SET order_status=? WHERE id=?`,
+    [status, id]
+  );
+
+  res.json({ success: true, message: 'Order updated' });
+}
+
+static async deleteReview(req, res) {
+  const { id } = req.params;
+
+  await db.execute(`DELETE FROM reviews WHERE id=?`, [id]);
+
+  res.json({ success: true, message: 'Review deleted' });
+}
+
+static async getDisputes(req, res) {
+  const [rows] = await db.query(`SELECT * FROM disputes ORDER BY created_at DESC`);
+  res.json({ success: true, data: rows });
+}
+
+static async assignDispute(req, res) {
+  const { id } = req.params;
+  const { admin_id } = req.body;
+
+  await db.execute(
+    `UPDATE disputes SET assigned_admin=? WHERE id=?`,
+    [admin_id, id]
+  );
+
+  res.json({ success: true, message: 'Dispute assigned' });
+}
+
+static async resolveDispute(req, res) {
+  const { id } = req.params;
+
+  await db.execute(
+    `UPDATE disputes SET status='resolved' WHERE id=?`,
+    [id]
+  );
+
+  res.json({ success: true, message: 'Dispute resolved' });
+}
+
+static async getSecurityLogs(req, res) {
+  const [rows] = await db.query(
+    `SELECT * FROM security_logs ORDER BY created_at DESC LIMIT 100`
+  );
+
+  res.json({ success: true, data: rows });
+}
+
+static async getAuditTrail(req, res) {
+  const [rows] = await db.query(
+    `SELECT * FROM admin_logs ORDER BY created_at DESC LIMIT 100`
+  );
+
+  res.json({ success: true, data: rows });
+}
+
+static async getSettings(req, res) {
+  const [rows] = await db.query(`SELECT * FROM system_settings`);
+  res.json({ success: true, data: rows });
+}
+
+static async updateSetting(req, res) {
+  const { key } = req.params;
+  const { value } = req.body;
+
+  await db.execute(
+    `UPDATE system_settings SET value=? WHERE \`key\`=?`,
+    [value, key]
+  );
+
+  res.json({ success: true, message: 'Setting updated' });
+}
+
+static async getAdmins(req, res) {
+  const [rows] = await db.query(`SELECT id, email, role FROM admins`);
+  res.json({ success: true, data: rows });
+}
+
+static async createAdmin(req, res) {
+  const { email, password, role } = req.body;
+
+  await db.execute(
+    `INSERT INTO admins (email, password, role) VALUES (?, ?, ?)`,
+    [email, password, role]
+  );
+
+  res.json({ success: true, message: 'Admin created' });
+}
+
+static async releaseEscrow(req, res) {
+  const { id } = req.params;
+
+  await db.execute(
+    `UPDATE escrow_transactions SET status='released' WHERE order_id=?`,
+    [id]
+  );
+
+  res.json({ success: true, message: 'Escrow released' });
+}
+
 /**
  * HELPERS
  */
