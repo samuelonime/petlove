@@ -458,12 +458,12 @@ class AdminController {
   
     res.json({ success: true, message: 'Escrow released' });
   }
-  
+
   /**
    * HELPERS
    */
   
-  async function logAction(adminId, action, req) {
+async function logAction(adminId, action, req) {
     await db.execute(
       `INSERT INTO admin_logs 
       (admin_id, action, ip_address, user_agent, created_at)
