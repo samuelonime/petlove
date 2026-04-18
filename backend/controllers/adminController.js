@@ -463,7 +463,7 @@ class AdminController {
    * HELPERS
    */
   
-async function logAction(adminId, action, req) {
+async async logAction(adminId, action, req) {
     await db.execute(
       `INSERT INTO admin_logs 
       (admin_id, action, ip_address, user_agent, created_at)
@@ -472,7 +472,7 @@ async function logAction(adminId, action, req) {
     );
   }
   
-  async function logSecurity(event, req, details) {
+  async async logSecurity(event, req, details) {
     await db.execute(
       `INSERT INTO security_logs 
       (event_type, ip_address, user_agent, details, severity, created_at)
