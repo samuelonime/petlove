@@ -487,7 +487,7 @@ class AdminController {
 }
 
 module.exports = AdminController;        { expiresIn: '15m' }
-      );
+      
 
       const refreshToken = crypto.randomBytes(40).toString('hex');
 
