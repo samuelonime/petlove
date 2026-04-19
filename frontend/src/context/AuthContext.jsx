@@ -8,9 +8,9 @@ const AuthContext = createContext({});
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser]       = useState(null);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken]     = useState(localStorage.getItem('token'));
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -26,11 +26,18 @@ export const AuthProvider = ({ children }) => {
       const userData = await authService.getProfile();
       setUser(userData);
     } catch (error) {
-      console.error('Failed to load user:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      console.error('Full error object:', error);
-      logout();
+      const status = error.response?.status;
+      // Only logout on explicit 401 (invalid/expired token).
+      // Do NOT logout on network errors, 500s, or any other issue —
+      // that causes the "login then immediately logged out" bug.
+      if (status === 401) {
+        localStorage.removeItem('token');
+        setToken(null);
+        setUser(null);
+      } else {
+        console.error('Could not load user profile:', error.message);
+        // Keep the token — the backend may just be temporarily unavailable
+      }
     } finally {
       setLoading(false);
     }
@@ -40,53 +47,53 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authService.login(email, password);
       const { token, user } = response;
-      
+
       localStorage.setItem('token', token);
       setToken(token);
       setUser(user);
-      
+
       toast.success('Login successful!');
-      
-      // Redirect based on user type
-      if (user.user_type === 'admin') {
-        navigate('/admin');
-      } else if (user.user_type === 'seller') {
-        navigate('/seller');
-      } else {
-        navigate('/');
-      }
-      
+
+      if (user.user_type === 'admin')       navigate('/admin');
+      else if (user.user_type === 'seller') navigate('/seller');
+      else                                  navigate('/');
+
       return { success: true };
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Login failed');
-      return { success: false, error: error.message };
+      const msg = error.response?.data?.error || 'Login failed';
+      toast.error(msg);
+      return { success: false, error: msg };
     }
+  };
+
+  // Used by GoogleCallback after OAuth redirect
+  const loginWithToken = (jwtToken, userData) => {
+    localStorage.setItem('token', jwtToken);
+    setToken(jwtToken);
+    setUser(userData);
+    toast.success(`Welcome, ${userData.name}! 🎉`);
   };
 
   const register = async (userData) => {
     try {
       const response = await authService.register(userData);
       const { token, user } = response;
-      
+
       localStorage.setItem('token', token);
       setToken(token);
       setUser(user);
-      
+
       toast.success('Registration successful!');
-      
-      // Redirect based on user type
-      if (user.user_type === 'admin') {
-        navigate('/admin');
-      } else if (user.user_type === 'seller') {
-        navigate('/seller');
-      } else {
-        navigate('/buyer');
-      }
-      
+
+      if (user.user_type === 'admin')       navigate('/admin');
+      else if (user.user_type === 'seller') navigate('/seller');
+      else                                  navigate('/buyer');
+
       return { success: true };
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Registration failed');
-      return { success: false, error: error.message };
+      const msg = error.response?.data?.error || 'Registration failed';
+      toast.error(msg);
+      return { success: false, error: msg };
     }
   };
 
@@ -111,17 +118,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   const value = {
-    user,
-    token,
-    loading,
-    login,
-    register,
-    logout,
-    updateProfile,
+    user, token, loading,
+    login, loginWithToken, register, logout, updateProfile,
     isAuthenticated: !!user,
-    isAdmin: user?.user_type === 'admin',
+    isAdmin:  user?.user_type === 'admin',
     isSeller: user?.user_type === 'seller',
-    isBuyer: user?.user_type === 'buyer',
+    isBuyer:  user?.user_type === 'buyer',
   };
 
   return (
