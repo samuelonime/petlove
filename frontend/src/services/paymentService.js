@@ -8,23 +8,16 @@ const paymentService = {
 
   initializePaystack: (amount, email, reference, metadata = {}) => {
     const handler = window.PaystackPop && new window.PaystackPop();
-    
-    if (!handler) {
-      throw new Error('Paystack not loaded');
-    }
+    if (!handler) throw new Error('Paystack not loaded');
 
     handler.newTransaction({
       key: import.meta.env.VITE_PAYSTACK_PK,
       email,
-      amount: amount * 100, // Convert to kobo
+      amount: amount * 100,
       ref: reference,
       metadata,
-      callback: (response) => {
-        return response;
-      },
-      onClose: () => {
-        console.log('Payment window closed');
-      },
+      callback: (response) => response,
+      onClose: () => console.log('Payment window closed'),
     });
   },
 
@@ -36,16 +29,10 @@ const paymentService = {
         amount,
         currency: 'NGN',
         payment_options: 'card, banktransfer, ussd',
-        customer: {
-          email,
-        },
+        customer: { email },
         meta: metadata,
-        callback: (response) => {
-          resolve(response);
-        },
-        onclose: () => {
-          reject(new Error('Payment closed'));
-        },
+        callback: (response) => resolve(response),
+        onclose: () => reject(new Error('Payment closed')),
       });
     });
   },
