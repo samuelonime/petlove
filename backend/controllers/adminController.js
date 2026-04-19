@@ -147,6 +147,10 @@ class AdminController {
     }
   }
 
+  static async healthCheck(req, res) {
+  res.json({ status: "ok" });
+  }
+
   /**
    * DASHBOARD STATS (MYSQL ONLY)
    */
