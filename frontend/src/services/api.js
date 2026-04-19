@@ -1,13 +1,17 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://petlove-production-53ae.up.railway.app';
+// Base URL should be the Railway domain only — no trailing slash, no /api
+// All service files use paths like /products, /orders etc.
+// We add /api here once so it applies everywhere.
+const BASE = (import.meta.env.VITE_API_URL || 'https://petlove-production-53ae.up.railway.app')
+  .replace(/\/api\/?$/, ''); // strip trailing /api if someone accidentally added it
 
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: `${BASE}/api`,
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Attach token to every request
+// Attach JWT token to every request
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -17,13 +21,12 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Only force-logout on 401. Never redirect on network/500 errors.
+// Only force-logout on real 401s — never on network/500 errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      // Only redirect if we're NOT already on the login page
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
