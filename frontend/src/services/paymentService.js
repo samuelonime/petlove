@@ -2,7 +2,7 @@ import api from './api';
 
 const paymentService = {
   verifyPayment: async (reference) => {
-    const response = await api.post('/payments/verify', { reference });
+    const response = await api.post('/api/payments/verify', { reference });
     return response.data;
   },
 
