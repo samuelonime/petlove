@@ -47,7 +47,7 @@ class User {
 
   static async findById(id) {
     const [rows] = await db.execute(
-      'SELECT id, name, email, phone, user_type, google_id, avatar, created_at FROM users WHERE id = ?',
+      'SELECT id, name, email, phone, user_type, google_id, created_at FROM users WHERE id = ?',
       [id]
     );
     return rows[0];
