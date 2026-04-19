@@ -14,42 +14,30 @@ const productService = {
 
   createProduct: async (productData) => {
     const formData = new FormData();
-    
     Object.keys(productData).forEach(key => {
       if (key === 'images' && productData[key]) {
-        productData[key].forEach(file => {
-          formData.append('images', file);
-        });
+        productData[key].forEach(file => formData.append('images', file));
       } else {
         formData.append(key, productData[key]);
       }
     });
-
     const response = await api.post('/api/products', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
 
   updateProduct: async (id, productData) => {
     const formData = new FormData();
-    
     Object.keys(productData).forEach(key => {
       if (key === 'images' && productData[key]) {
-        productData[key].forEach(file => {
-          formData.append('images', file);
-        });
+        productData[key].forEach(file => formData.append('images', file));
       } else {
         formData.append(key, productData[key]);
       }
     });
-
     const response = await api.put(`/api/products/${id}`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
