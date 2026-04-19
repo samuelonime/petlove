@@ -1,13 +1,9 @@
 import axios from 'axios';
 
-// Base URL should be the Railway domain only — no trailing slash, no /api
-// All service files use paths like /products, /orders etc.
-// We add /api here once so it applies everywhere.
-const BASE = (import.meta.env.VITE_API_URL || 'https://petlove-production-53ae.up.railway.app')
-  .replace(/\/api\/?$/, ''); // strip trailing /api if someone accidentally added it
+const API_URL = import.meta.env.VITE_API_URL || 'https://petlove-production-53ae.up.railway.app';
 
 const api = axios.create({
-  baseURL: `${BASE}/api`,
+  baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -21,7 +17,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Only force-logout on real 401s — never on network/500 errors
+// Only force-logout on real 401 — never on network/500 errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
