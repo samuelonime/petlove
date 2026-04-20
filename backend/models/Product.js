@@ -11,6 +11,7 @@ class Product {
     return result.insertId;
   }
 
+  // --- SAFE JSON PARSE FIX HERE ---
   static async findById(id) {
     const [rows] = await db.execute(
       `SELECT p.*, u.name as seller_name 
@@ -19,21 +20,34 @@ class Product {
        WHERE p.id = ?`,
       [id]
     );
+
     if (rows[0]) {
-      rows[0].images = JSON.parse(rows[0].images || '[]');
+      try {
+        rows[0].images = JSON.parse(rows[0].images || '[]');
+      } catch {
+        rows[0].images = rows[0].images ? [rows[0].images] : [];
+      }
     }
+
     return rows[0];
   }
 
+  // --- SAFE JSON PARSE FIX HERE ---
   static async findBySeller(sellerId) {
     const [rows] = await db.execute(
       'SELECT * FROM products WHERE seller_id = ? ORDER BY created_at DESC',
       [sellerId]
     );
-    return rows.map(row => ({
-      ...row,
-      images: JSON.parse(row.images || '[]')
-    }));
+
+    return rows.map(row => {
+      let safeImages = [];
+      try {
+        safeImages = JSON.parse(row.images || '[]');
+      } catch {
+        safeImages = row.images ? [row.images] : [];
+      }
+      return { ...row, images: safeImages };
+    });
   }
 
   static async update(id, productData) {
@@ -50,6 +64,7 @@ class Product {
     await db.execute('DELETE FROM products WHERE id = ?', [id]);
   }
 
+  // --- SAFE JSON PARSE FIX HERE ---
   static async getAll(filters = {}) {
     let query = 'SELECT * FROM products WHERE 1=1';
     const params = [];
@@ -78,10 +93,16 @@ class Product {
     query += ' ORDER BY created_at DESC';
 
     const [rows] = await db.execute(query, params);
-    return rows.map(row => ({
-      ...row,
-      images: JSON.parse(row.images || '[]')
-    }));
+
+    return rows.map(row => {
+      let safeImages = [];
+      try {
+        safeImages = JSON.parse(row.images || '[]');
+      } catch {
+        safeImages = row.images ? [row.images] : [];
+      }
+      return { ...row, images: safeImages };
+    });
   }
 
   static async updateStock(id, quantity) {
