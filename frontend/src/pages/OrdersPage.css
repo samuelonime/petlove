@@ -1,4 +1,4 @@
-/* OrdersPage.css — Mobile-first rewrite */
+/* OrdersPage.css — Mobile-first */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
 .order-page {
@@ -17,7 +17,7 @@
   margin: 0 0 1.5rem;
 }
 
-/* ── No orders state ── */
+/* ── Empty state ── */
 .no-orders {
   text-align: center;
   padding: 4rem 1.5rem;
@@ -26,20 +26,40 @@
   border: 1px solid #e2e8f0;
   box-shadow: 0 4px 16px rgba(0,0,0,0.06);
 }
+
 .no-orders-icon { font-size: 3rem; margin-bottom: 1rem; }
-.no-orders h2 { font-size: 1.25rem; color: #1e293b; margin-bottom: 0.5rem; }
-.no-orders p  { color: #64748b; margin-bottom: 1.5rem; font-size: 0.9rem; }
-.no-orders a  {
-  display: inline-flex; align-items: center;
+
+.no-orders h2 {
+  font-size: 1.25rem;
+  color: #1e293b;
+  margin-bottom: 0.5rem;
+}
+
+.no-orders p {
+  color: #64748b;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.no-orders a {
+  display: inline-flex;
+  align-items: center;
   padding: 0.75rem 1.5rem;
-  background: #2563eb; color: white;
-  text-decoration: none; border-radius: 10px;
-  font-weight: 600; font-size: 0.9rem;
+  background: #2563eb;
+  color: white;
+  text-decoration: none;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.9rem;
   transition: background 0.2s, transform 0.2s;
 }
-.no-orders a:hover { background: #1d4ed8; transform: translateY(-1px); }
 
-/* ── Desktop: classic table ── */
+.no-orders a:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+/* ── Table wrapper ── */
 .orders-table-wrapper {
   background: white;
   border-radius: 16px;
@@ -62,6 +82,7 @@ th {
   text-transform: uppercase;
   letter-spacing: 0.07em;
   text-align: left;
+  white-space: nowrap;
 }
 
 td {
@@ -76,7 +97,9 @@ tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: #f8fafc; }
 
 td a {
-  color: #2563eb; font-weight: 500; text-decoration: none;
+  color: #2563eb;
+  font-weight: 500;
+  text-decoration: none;
   padding: 0.4rem 0.85rem;
   background: #eff6ff;
   border-radius: 7px;
@@ -84,155 +107,58 @@ td a {
   display: inline-block;
   transition: background 0.2s;
 }
+
 td a:hover { background: #dbeafe; }
 
-/* Status badges */
+/* ── Status badges ── */
 .order-status {
-  display: inline-flex; align-items: center;
+  display: inline-flex;
+  align-items: center;
   padding: 0.3rem 0.75rem;
   border-radius: 999px;
-  font-size: 0.72rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.05em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
-.order-status.pending    { background: #fef3c7; color: #92400e; }
-.order-status.paid       { background: #dbeafe; color: #1e40af; }
-.order-status.processing { background: #ede9fe; color: #5b21b6; }
-.order-status.shipped    { background: #e0e7ff; color: #3730a3; }
-.order-status.completed  { background: #dcfce7; color: #166534; }
-.order-status.cancelled  { background: #fee2e2; color: #991b1b; }
 
-/* ── Mobile: card layout ── */
+.order-status.pending         { background: #fef3c7; color: #92400e; }
+.order-status.paid            { background: #dbeafe; color: #1e40af; }
+.order-status.processing      { background: #ede9fe; color: #5b21b6; }
+.order-status.shipped         { background: #e0e7ff; color: #3730a3; }
+.order-status.completed       { background: #dcfce7; color: #166534; }
+.order-status.cancelled       { background: #fee2e2; color: #991b1b; }
+.order-status.pending_payment { background: #fef3c7; color: #92400e; }
+.order-status.delivered       { background: #dcfce7; color: #166534; }
+.order-status.disputed        { background: #fee2e2; color: #991b1b; }
+
+/* ── Mobile ── */
 @media (max-width: 640px) {
-  .order-page { padding: 1.25rem 0.875rem 3rem; }
-
-  /* Hide the table, show cards instead */
-  .orders-table-wrapper table { display: none; }
-
-  /* Card list rendered via JS — see note below */
-  .orders-card-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.85rem;
+  .order-page {
+    padding: 1.25rem 0.875rem 3rem;
   }
 
-  .order-card {
-    background: white;
-    border-radius: 14px;
-    border: 1px solid #e2e8f0;
-    padding: 1.1rem 1.25rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .order-card-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 0.75rem;
-  }
-
-  .order-card-id {
-    font-size: 1rem;
-    font-weight: 700;
-    color: #0f172a;
-  }
-
-  .order-card-date {
-    font-size: 0.78rem;
-    color: #94a3b8;
-    margin-top: 0.15rem;
-  }
-
-  .order-card-bottom {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-top: 0.75rem;
-    border-top: 1px solid #f1f5f9;
-  }
-
-  .order-card-total {
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: #2563eb;
-  }
-
-  /* On mobile use responsive table fallback with horizontal scroll */
   .orders-table-wrapper {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
-  .orders-table-wrapper table { display: table; }
 
-  th, td { padding: 0.7rem 0.75rem; font-size: 0.8rem; }
+  th, td {
+    padding: 0.7rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
   th { font-size: 0.65rem; }
-  .order-status { font-size: 0.65rem; padding: 0.2rem 0.5rem; }
+
+  .order-status {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.5rem;
+  }
+
   td a { padding: 0.35rem 0.65rem; }
 }
 
 @media (min-width: 641px) {
   .order-page { padding: 2rem 1.5rem 4rem; }
 }
-  padding: 4rem 2rem;
-  color: #64748b;
-}
 
-.no-orders-icon {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-}
-
-.no-orders h2 {
-  font-size: 1.5rem;
-  color: #1e293b;
-  margin-bottom: 0.5rem;
-}
-
-.no-orders p {
-  color: #64748b;
-  margin-bottom: 1.5rem;
-}
-
-.no-orders a {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.75rem 1.5rem;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
-  text-decoration: none;
-  border-radius: 0.75rem;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-}
-
-.no-orders a:hover {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-  transform: translateY(-2px);
-}
-
-@media (max-width: 768px) {
-  .order-page {
-    padding: 1rem;
-  }
-
-  .order-page h1 {
-    font-size: 1.5rem;
-  }
-
-  table {
-    font-size: 0.85rem;
-  }
-
-  th, td {
-    padding: 0.75rem 0.5rem;
-  }
-
-  .order-status {
-    font-size: 0.7rem;
-    padding: 0.25rem 0.625rem;
-  }
-}
