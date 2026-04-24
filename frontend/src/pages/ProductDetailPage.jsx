@@ -18,7 +18,7 @@ const ProductDetailPage = () => {
     const fetchProduct = async () => {
       try {
         const res = await api.get(`/api/products/${id}`);
-        setProduct(res.data);
+        setProduct(res.data.product || res.data);
       } catch (err) {
         console.error('Error fetching product:', err);
       } finally {
@@ -113,7 +113,7 @@ const ProductDetailPage = () => {
 
             {/* Price Section */}
             <div className="price-section">
-              <span className="current-price">${product.price?.toFixed(2)}</span>
+              <span className="current-price">₦{product.price?.toLocaleString('en-NG')}</span>
               {product.originalPrice && (
                 <>
                   <span className="original-price">${product.originalPrice.toFixed(2)}</span>
