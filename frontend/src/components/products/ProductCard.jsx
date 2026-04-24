@@ -23,10 +23,10 @@ const ProductCard = ({ product }) => {
   };
 
   const getStockLevel = (stock) => {
-    if (stock === 0) return { level: 'out', text: 'Out of Stock', dotClass: 'low' };
-    if (stock <= 10) return { level: 'low', text: `Low Stock (${stock})`, dotClass: 'low' };
-    if (stock <= 30) return { level: 'medium', text: `In Stock (${stock})`, dotClass: 'medium' };
-    return { level: 'high', text: `In Stock (${stock})`, dotClass: 'high' };
+    if (stock === 0) return { level: 'out', text: '', dotClass: 'low' };
+    if (stock <= 10) return { level: 'low', text: '', dotClass: 'low' };
+    if (stock <= 30) return { level: 'medium', text: '', dotClass: 'medium' };
+    return { level: 'high', text: '', dotClass: 'high' };
   };
 
   const getRatingStars = (rating = 3) => {
@@ -140,7 +140,7 @@ const ProductCard = ({ product }) => {
           >
             <FaShoppingCart className="cart-icon" />
             <span className="btn-text">
-              {product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
+              {product.stock === 0 ? 'Unavailable' : 'Add to Cart'}
             </span>
           </button>
         </div>
