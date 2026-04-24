@@ -264,7 +264,7 @@ const SellerPage = () => {
                           ? 'stock-medium'
                           : 'stock-low'
                       }`}>
-                        {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
+                        
                       </span>
                     </div>
                     <div className="product-actions">
