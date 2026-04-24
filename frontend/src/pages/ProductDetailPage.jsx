@@ -130,7 +130,7 @@ const ProductDetailPage = () => {
             <div className="stock-rating">
               <div className={`stock-status ${product.stock > 0 ? 'in-stock' : 'out-of-stock'}`}>
                 <div className={`stock-dot ${product.stock > 0 ? 'in-stock' : 'out-of-stock'}`}></div>
-                {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
+                
               </div>
               
               {product.rating && (
@@ -186,7 +186,7 @@ const ProductDetailPage = () => {
                 disabled={product.stock <= 0}
               >
                 <FaShoppingCart />
-                {product.stock > 0 ? 'Add to Cart' : 'Out of Stock'}
+                {product.stock > 0 ? 'Add to Cart' : 'Unavailable'}
               </button>
               
               <button 
