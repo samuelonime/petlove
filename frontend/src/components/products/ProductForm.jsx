@@ -13,109 +13,68 @@ const CATEGORIES = [
   { value: "bedding",     label: "Bedding" },
 ];
 
-const MAX_IMAGES = 5;
-
 const ProductForm = ({ product = null, onSuccess }) => {
-  const [fields, setFields] = useState({
-    name:        product?.name        || "",
-    description: product?.description || "",
-    category:    product?.category    || "food",
-    price:       product?.price       || "",
-    stock:       product?.stock       || "",
-  });
-  const [errors,        setErrors]        = useState({});
+  const [name,        setName]        = useState(product?.name        ?? "");
+  const [description, setDescription] = useState(product?.description ?? "");
+  const [category,    setCategory]    = useState(product?.category    ?? "food");
+  const [price,       setPrice]       = useState(product?.price       ?? "");
+  const [stock,       setStock]       = useState(product?.stock       ?? "");
+  const [errors,      setErrors]      = useState({});
   const [images,        setImages]        = useState(product?.images || []);
   const [removedImages, setRemovedImages] = useState([]);
   const [newImages,     setNewImages]     = useState([]);
   const [loading,       setLoading]       = useState(false);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFields((prev) => ({ ...prev, [name]: value }));
-    // Clear error on change
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
-  };
-
   const validate = () => {
-    const errs = {};
-    if (!fields.name.trim())        errs.name        = "Product name is required";
-    if (!fields.description.trim()) errs.description = "Description is required";
-    if (!fields.category)           errs.category    = "Category is required";
-
-    const price = parseFloat(fields.price);
-    if (fields.price === "" || fields.price === null)
-      errs.price = "Price is required";
-    else if (isNaN(price) || price <= 0)
-      errs.price = "Price must be a positive number";
-
-    const stock = parseInt(fields.stock);
-    if (fields.stock === "" || fields.stock === null)
-      errs.stock = "Stock is required";
-    else if (isNaN(stock) || stock < 0)
-      errs.stock = "Stock must be 0 or more";
-
-    return errs;
+    const e = {};
+    if (!name.trim())        e.name        = "Product name is required";
+    if (!description.trim()) e.description = "Description is required";
+    if (!category)           e.category    = "Category is required";
+    if (price === "" || price === null || price === undefined)
+      e.price = "Price is required";
+    else if (isNaN(parseFloat(price)) || parseFloat(price) <= 0)
+      e.price = "Price must be greater than 0";
+    if (stock === "" || stock === null || stock === undefined)
+      e.stock = "Stock is required";
+    else if (isNaN(parseInt(stock)) || parseInt(stock) < 0)
+      e.stock = "Stock must be 0 or more";
+    return e;
   };
 
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
-    if (images.length + newImages.length + files.length > MAX_IMAGES) {
-      toast.error("Maximum 5 images allowed");
-      return;
+    if (images.length + newImages.length + files.length > 5) {
+      toast.error("Maximum 5 images allowed"); return;
     }
-    const mapped = files.map((file) => ({
-      file,
-      preview: URL.createObjectURL(file),
-    }));
-    setNewImages((prev) => [...prev, ...mapped]);
-  };
-
-  const removeExistingImage = (i) => {
-    setRemovedImages((prev) => [...prev, images[i]]);
-    setImages(images.filter((_, idx) => idx !== i));
-  };
-
-  const removeNewImage = (i) => {
-    URL.revokeObjectURL(newImages[i].preview);
-    setNewImages(newImages.filter((_, idx) => idx !== i));
+    setNewImages(prev => [...prev, ...files.map(f => ({ file: f, preview: URL.createObjectURL(f) }))]);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     const errs = validate();
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      return;
-    }
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    setErrors({});
 
     try {
       setLoading(true);
+      const fd = new FormData();
+      fd.append("name",        name.trim());
+      fd.append("description", description.trim());
+      fd.append("category",    category);
+      fd.append("price",       String(parseFloat(price)));
+      fd.append("stock",       String(parseInt(stock)));
+      fd.append("removedImages", JSON.stringify(removedImages));
+      images.forEach(img => fd.append("existingImages[]", img));
+      newImages.forEach(img => fd.append("images", img.file));
 
-      const formData = new FormData();
-      formData.append("name",        fields.name.trim());
-      formData.append("description", fields.description.trim());
-      formData.append("category",    fields.category);
-      formData.append("price",       parseFloat(fields.price));
-      formData.append("stock",       parseInt(fields.stock));
-      formData.append("removedImages", JSON.stringify(removedImages));
+      const response = product
+        ? await productService.updateProduct(product.id, fd)
+        : await productService.createProduct(fd);
 
-      images.forEach((img) => formData.append("existingImages[]", img));
-      newImages.forEach((img) => formData.append("images", img.file));
-
-      let response;
-      if (product) {
-        response = await productService.updateProduct(product.id, formData);
-        toast.success("Product updated!");
-      } else {
-        response = await productService.createProduct(formData);
-        toast.success("Product created!");
-      }
-
+      toast.success(product ? "Product updated!" : "Product created!");
       if (onSuccess) onSuccess(response.product);
-
-    } catch (error) {
-      toast.error(error.response?.data?.error || "Operation failed");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Operation failed");
     } finally {
       setLoading(false);
     }
@@ -125,148 +84,89 @@ const ProductForm = ({ product = null, onSuccess }) => {
     <div className="product-form-container">
       <form onSubmit={handleSubmit} className="product-form" noValidate>
 
-        {/* Name */}
         <div className="form-group">
           <label className="form-label">Product Name *</label>
-          <input
-            type="text"
-            name="name"
-            value={fields.name}
-            onChange={handleChange}
+          <input type="text" value={name} onChange={e => { setName(e.target.value); setErrors(p => ({...p, name: ""})); }}
             placeholder="e.g. Royal Canin Dog Food"
-            className={`form-input ${errors.name ? "form-input-error" : ""}`}
-            disabled={loading}
-          />
+            className={`form-input ${errors.name ? "form-input-error" : ""}`} disabled={loading} />
           {errors.name && <p className="form-error">{errors.name}</p>}
         </div>
 
-        {/* Category */}
         <div className="form-group">
           <label className="form-label">Category *</label>
-          <select
-            name="category"
-            value={fields.category}
-            onChange={handleChange}
-            className={`form-select ${errors.category ? "form-select-error" : ""}`}
-            disabled={loading}
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
+          <select value={category} onChange={e => { setCategory(e.target.value); setErrors(p => ({...p, category: ""})); }}
+            className={`form-select ${errors.category ? "form-select-error" : ""}`} disabled={loading}>
+            {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>
           {errors.category && <p className="form-error">{errors.category}</p>}
         </div>
 
-        {/* Price */}
         <div className="form-group">
           <label className="form-label">Price (₦) *</label>
-          <input
-            type="number"
-            name="price"
-            value={fields.price}
-            onChange={handleChange}
-            step="0.01"
-            min="0"
-            placeholder="e.g. 5000"
-            className={`form-input ${errors.price ? "form-input-error" : ""}`}
-            disabled={loading}
-          />
+          <input type="number" value={price} onChange={e => { setPrice(e.target.value); setErrors(p => ({...p, price: ""})); }}
+            step="0.01" min="0" placeholder="e.g. 5000"
+            className={`form-input ${errors.price ? "form-input-error" : ""}`} disabled={loading} />
           {errors.price && <p className="form-error">{errors.price}</p>}
         </div>
 
-        {/* Stock */}
         <div className="form-group">
           <label className="form-label">Stock Quantity *</label>
-          <input
-            type="number"
-            name="stock"
-            value={fields.stock}
-            onChange={handleChange}
-            min="0"
-            placeholder="e.g. 20"
-            className={`form-input ${errors.stock ? "form-input-error" : ""}`}
-            disabled={loading}
-          />
+          <input type="number" value={stock} onChange={e => { setStock(e.target.value); setErrors(p => ({...p, stock: ""})); }}
+            min="0" placeholder="e.g. 20"
+            className={`form-input ${errors.stock ? "form-input-error" : ""}`} disabled={loading} />
           {errors.stock && <p className="form-error">{errors.stock}</p>}
         </div>
 
-        {/* Description */}
         <div className="form-group">
           <label className="form-label">Description *</label>
-          <textarea
-            name="description"
-            value={fields.description}
-            onChange={handleChange}
-            placeholder="Describe your product — features, benefits, usage..."
-            className={`form-textarea ${errors.description ? "form-textarea-error" : ""}`}
-            rows={5}
-            disabled={loading}
-          />
+          <textarea value={description} onChange={e => { setDescription(e.target.value); setErrors(p => ({...p, description: ""})); }}
+            placeholder="Describe your product..." rows={5}
+            className={`form-textarea ${errors.description ? "form-textarea-error" : ""}`} disabled={loading} />
           {errors.description && <p className="form-error">{errors.description}</p>}
         </div>
 
-        {/* Images */}
         <div className="form-group">
           <label className="form-label">
-            Product Images{" "}
-            <span style={{ fontWeight: 400, textTransform: "none", color: "#94a3b8" }}>
-              (optional, max 5)
-            </span>
+            Product Images <span style={{fontWeight:400,textTransform:"none",color:"#94a3b8"}}>(optional, max 5)</span>
           </label>
-
           {images.length > 0 && (
             <div className="images-grid">
               {images.map((img, i) => (
                 <div key={i} className="image-preview-container">
                   <img src={img} className="image-preview" alt="" />
-                  <button type="button" className="image-remove-btn" onClick={() => removeExistingImage(i)}>
+                  <button type="button" className="image-remove-btn"
+                    onClick={() => { setRemovedImages(p => [...p, images[i]]); setImages(images.filter((_,idx) => idx !== i)); }}>
                     <FaTimes />
                   </button>
                 </div>
               ))}
             </div>
           )}
-
           {newImages.length > 0 && (
             <div className="images-grid">
               {newImages.map((img, i) => (
                 <div key={i} className="image-preview-container">
                   <img src={img.preview} className="image-preview" alt="" />
-                  <button type="button" className="image-remove-btn" onClick={() => removeNewImage(i)}>
+                  <button type="button" className="image-remove-btn"
+                    onClick={() => { URL.revokeObjectURL(img.preview); setNewImages(newImages.filter((_,idx) => idx !== i)); }}>
                     <FaTimes />
                   </button>
                 </div>
               ))}
             </div>
           )}
-
-          {images.length + newImages.length < MAX_IMAGES && (
+          {images.length + newImages.length < 5 && (
             <label className="upload-area">
-              <input
-                type="file"
-                multiple
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="upload-input"
-              />
+              <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="upload-input" />
               <FaUpload className="upload-icon" />
               <p>Click or drag to upload images</p>
             </label>
           )}
-
-          <p className="images-counter">
-            {images.length + newImages.length} / {MAX_IMAGES} images
-          </p>
+          <p className="images-counter">{images.length + newImages.length} / 5 images</p>
         </div>
 
-        {/* Actions */}
         <div className="form-actions">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => window.history.back()}
-            disabled={loading}
-          >
+          <button type="button" className="btn btn-secondary" onClick={() => window.history.back()} disabled={loading}>
             Cancel
           </button>
           <button type="submit" disabled={loading} className="btn btn-primary">
