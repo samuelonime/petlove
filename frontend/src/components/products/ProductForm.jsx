@@ -34,9 +34,7 @@ const ProductForm = ({ product = null, onSuccess }) => {
       e.price = "Price is required";
     else if (isNaN(parseFloat(price)) || parseFloat(price) <= 0)
       e.price = "Price must be greater than 0";
-    if (stock === "" || stock === null || stock === undefined)
-      e.stock = "Stock is required";
-    else if (isNaN(parseInt(stock)) || parseInt(stock) < 0)
+    if (stock !== "" && stock !== null && stock !== undefined && (isNaN(parseInt(stock)) || parseInt(stock) < 0))
       e.stock = "Stock must be 0 or more";
     return e;
   };
@@ -62,7 +60,7 @@ const ProductForm = ({ product = null, onSuccess }) => {
       fd.append("description", description.trim());
       fd.append("category",    category);
       fd.append("price",       String(parseFloat(price)));
-      fd.append("stock",       String(parseInt(stock)));
+      fd.append("stock", stock !== "" && stock !== null ? String(parseInt(stock)) : "0");
       fd.append("removedImages", JSON.stringify(removedImages));
       images.forEach(img => fd.append("existingImages[]", img));
       newImages.forEach(img => fd.append("images", img.file));
@@ -110,7 +108,7 @@ const ProductForm = ({ product = null, onSuccess }) => {
         </div>
 
         <div className="form-group">
-          <label className="form-label">Stock Quantity *</label>
+          <label className="form-label">Stock Quantity</label>
           <input type="number" value={stock} onChange={e => { setStock(e.target.value); setErrors(p => ({...p, stock: ""})); }}
             min="0" placeholder="e.g. 20"
             className={`form-input ${errors.stock ? "form-input-error" : ""}`} disabled={loading} />
