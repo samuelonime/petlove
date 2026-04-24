@@ -36,17 +36,30 @@ const CheckoutPage = () => {
     setError('');
 
     try {
-      const res = await api.post('/orders/checkout', {
-        shipping: shippingInfo,
-        items: cartItems,
-        total: cartTotal,
+      // Map cart items to backend expected shape
+      const items = cartItems.map(item => ({
+        product_id: item.id,
+        quantity: item.quantity,
+      }));
+
+      const res = await api.post('/api/orders', {
+        items,
+        delivery_option: 'standard',
+        express_shipping: false,
+        shipping_address: `${shippingInfo.address}, ${shippingInfo.city} ${shippingInfo.postalCode}`,
+        recipient_name: shippingInfo.name,
       });
 
-      if (res.data.paymentUrl) {
-        window.location.href = res.data.paymentUrl;
-      } else {
+      // Backend returns { order, payment } or { order, paymentUrl }
+      const paymentUrl = res.data.paymentUrl || res.data.payment?.authorization_url;
+
+      if (paymentUrl) {
         clearCart();
-        navigate(`/payment/callback?tx_ref=${res.data.reference}`);
+        window.location.href = paymentUrl;
+      } else {
+        // No payment gateway configured — treat as cash on delivery
+        clearCart();
+        navigate(`/orders/${res.data.order?.id || res.data.orderId}`);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Checkout failed. Please try again.');
