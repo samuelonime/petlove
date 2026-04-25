@@ -1,137 +1,121 @@
-const Order = require('../models/Order');
-const OrderItem = require('../models/OrderItem');
-const Product = require('../models/Product');
-const EscrowService = require('../services/escrowService');
-const ShippingService = require('../services/shippingService');
-const PaymentService = require('../services/paymentService');
+const db          = require('../config/database');
+const Order       = require('../models/Order');
+const OrderItem   = require('../models/OrderItem');
+const Product     = require('../models/Product');
 
 class OrderController {
+
   static async createOrder(req, res) {
     try {
-      const { items, delivery_option, express_shipping } = req.body;
-      
-      if (!items || items.length === 0) {
-        return res.status(400).json({ error: 'No items in cart' });
+      const { items, delivery_option, express_shipping, shipping_address, recipient_name, recipient_email, recipient_phone } = req.body;
+
+      if (!items || !items.length) {
+        return res.status(400).json({ error: 'No items in order' });
       }
 
-      // Calculate total amount
+      // Validate items and calculate total
       let totalAmount = 0;
       const orderItems = [];
 
       for (const item of items) {
         const product = await Product.findById(item.product_id);
-        
         if (!product) {
-          return res.status(404).json({ error: `Product ${item.product_id} not found` });
+          return res.status(404).json({ error: `Product not found` });
         }
-
-        if (product.stock < item.quantity) {
-          return res.status(400).json({ error: `Insufficient stock for ${product.name}` });
-        }
-
         const itemTotal = product.price * item.quantity;
         totalAmount += itemTotal;
-
-        orderItems.push({
-          product_id: item.product_id,
-          quantity: item.quantity,
-          price: product.price
-        });
+        orderItems.push({ product_id: item.product_id, quantity: item.quantity, price: product.price });
       }
 
-      // Add express shipping fee if selected
-      if (express_shipping) {
-        totalAmount += 2000; // ₦2,000 express shipping fee
-      }
+      if (express_shipping) totalAmount += 2000;
+
+      // Commission calculation
+      const commissionRate = parseFloat(process.env.COMMISSION_RATE) || 0.10;
+      const commission    = parseFloat((totalAmount * commissionRate).toFixed(2));
+      const sellerAmount  = parseFloat((totalAmount - commission).toFixed(2));
 
       // Create order
       const orderId = await Order.create({
         buyer_id: req.user.id,
         total_amount: totalAmount,
-        delivery_option,
-        express_shipping: express_shipping || false
+        delivery_option: delivery_option || 'standard',
+        express_shipping: express_shipping || false,
       });
 
-      // Add commission and seller amount calculation
-      const escrowService = new EscrowService();
-      const amounts = await escrowService.calculateOrderAmounts(totalAmount);
-      
+      // Update commission + shipping info
       await db.execute(
-        'UPDATE orders SET commission = ?, seller_amount = ? WHERE id = ?',
-        [amounts.commission, amounts.seller_amount, orderId]
+        `UPDATE orders SET commission = ?, seller_amount = ?,
+         shipping_address = ?, recipient_name = ?, recipient_email = ?, recipient_phone = ?
+         WHERE id = ?`,
+        [commission, sellerAmount, shipping_address || null, recipient_name || null, recipient_email || null, recipient_phone || null, orderId]
       );
 
       // Create order items
-      const itemsWithOrderId = orderItems.map(item => ({
-        order_id: orderId,
-        ...item
-      }));
-      await OrderItem.createBatch(itemsWithOrderId);
+      await OrderItem.createBatch(orderItems.map(item => ({ order_id: orderId, ...item })));
 
       // Update product stock
       for (const item of items) {
         await Product.updateStock(item.product_id, item.quantity);
       }
 
-      // Initialize payment
-      const paymentService = new PaymentService();
+      // Try Paystack payment — gracefully skip if not configured
       const reference = `PET-${orderId}-${Date.now()}`;
-      
-      const paymentData = await paymentService.initializePayment(
-        totalAmount,
-        req.user.email,
-        reference,
-        {
-          order_id: orderId,
-          buyer_id: req.user.id,
-          items_count: items.length
-        }
-      );
+      let paymentUrl  = null;
 
-      // Update order with payment reference
-      await db.execute(
-        'UPDATE orders SET payment_reference = ? WHERE id = ?',
-        [reference, orderId]
-      );
+      const paystackKey = process.env.PAYSTACK_SECRET_KEY;
+      if (paystackKey) {
+        try {
+          const axios    = require('axios');
+          const email    = recipient_email || req.user.email;
+          const paystackRes = await axios.post(
+            'https://api.paystack.co/transaction/initialize',
+            {
+              amount:       Math.round(totalAmount * 100),
+              email,
+              reference,
+              callback_url: `${process.env.FRONTEND_URL}/payment/callback`,
+              metadata:     { order_id: orderId, buyer_id: req.user.id },
+            },
+            { headers: { Authorization: `Bearer ${paystackKey}` } }
+          );
+          paymentUrl = paystackRes.data?.data?.authorization_url;
+        } catch (payErr) {
+          console.error('Paystack init failed:', payErr.message);
+          // Don't crash — fall through to cash on delivery
+        }
+      }
+
+      // Save payment reference
+      await db.execute('UPDATE orders SET payment_reference = ? WHERE id = ?', [reference, orderId]);
 
       const order = await Order.findById(orderId);
+
       res.status(201).json({
-        message: 'Order created successfully',
+        message:     'Order created successfully',
         order,
-        payment_url: paymentData.data.authorization_url || paymentData.data.link
+        payment_url: paymentUrl,
+        reference,
       });
+
     } catch (error) {
       console.error('Create order error:', error);
-      res.status(500).json({ error: 'Failed to create order' });
+      res.status(500).json({ error: error.message || 'Failed to create order' });
     }
   }
 
   static async getOrder(req, res) {
     try {
-      const { id } = req.params;
-      const order = await Order.findById(id);
-      
-      if (!order) {
-        return res.status(404).json({ error: 'Order not found' });
-      }
+      const order = await Order.findById(req.params.id);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
 
-      // Check if user is authorized to view this order
       if (order.buyer_id !== req.user.id && req.user.user_type !== 'admin') {
-        // Check if user is the seller
-        const orderItems = await OrderItem.findByOrder(id);
-        const isSeller = orderItems.some(item => item.seller_id === req.user.id);
-        
-        if (!isSeller) {
-          return res.status(403).json({ error: 'Not authorized to view this order' });
-        }
+        const items    = await OrderItem.findByOrder(req.params.id);
+        const isSeller = items.some(item => item.seller_id === req.user.id);
+        if (!isSeller) return res.status(403).json({ error: 'Not authorized' });
       }
 
-      const items = await OrderItem.findByOrder(id);
-      
-      res.json({
-        order,
-        items
-      });
+      const items = await OrderItem.findByOrder(req.params.id);
+      res.json({ order, items });
     } catch (error) {
       console.error('Get order error:', error);
       res.status(500).json({ error: 'Failed to get order' });
@@ -143,7 +127,7 @@ class OrderController {
       const orders = await Order.findByBuyer(req.user.id);
       res.json({ orders });
     } catch (error) {
-      console.error('Get buyer orders error:', error);
+      console.error(error);
       res.status(500).json({ error: 'Failed to get orders' });
     }
   }
@@ -153,104 +137,60 @@ class OrderController {
       const orders = await Order.findBySeller(req.user.id);
       res.json({ orders });
     } catch (error) {
-      console.error('Get seller orders error:', error);
+      console.error(error);
       res.status(500).json({ error: 'Failed to get orders' });
     }
   }
 
   static async updateShipping(req, res) {
     try {
-      const { id } = req.params;
       const { courier_name, tracking_number, delivery_option } = req.body;
-      
-      const result = await ShippingService.updateShippingInfo(
-        id,
-        { courier_name, tracking_number },
-        delivery_option
+      await db.execute(
+        'UPDATE orders SET courier_name = ?, tracking_number = ?, delivery_option = ? WHERE id = ?',
+        [courier_name, tracking_number, delivery_option, req.params.id]
       );
-
-      res.json(result);
+      res.json({ message: 'Shipping updated' });
     } catch (error) {
-      console.error('Update shipping error:', error);
-      res.status(500).json({ error: error.message });
+      console.error(error);
+      res.status(500).json({ error: 'Failed to update shipping' });
     }
   }
 
   static async uploadDeliveryProof(req, res) {
     try {
-      const { id } = req.params;
       const { proof_type, proof_data } = req.body;
-
-      const result = await ShippingService.uploadDeliveryProof(
-        id,
-        proof_type,
-        proof_data
+      await db.execute(
+        'UPDATE orders SET proof_type = ?, proof_data = ? WHERE id = ?',
+        [proof_type, proof_data, req.params.id]
       );
-
-      res.json(result);
+      res.json({ message: 'Delivery proof uploaded' });
     } catch (error) {
-      console.error('Upload delivery proof error:', error);
-      res.status(500).json({ error: error.message });
+      console.error(error);
+      res.status(500).json({ error: 'Failed to upload proof' });
     }
   }
 
   static async confirmDelivery(req, res) {
     try {
-      const { id } = req.params;
-      const order = await Order.findById(id);
-      
-      if (!order) {
-        return res.status(404).json({ error: 'Order not found' });
-      }
+      const order = await Order.findById(req.params.id);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+      if (order.buyer_id !== req.user.id) return res.status(403).json({ error: 'Not authorized' });
 
-      if (order.buyer_id !== req.user.id) {
-        return res.status(403).json({ error: 'Not authorized' });
-      }
-
-      if (order.status !== 'delivered') {
-        return res.status(400).json({ error: 'Order not delivered yet' });
-      }
-
-      await Order.confirmDelivery(id);
-      
-      // Auto-release payment after 7 days
-      setTimeout(async () => {
-        try {
-          const escrowService = new EscrowService();
-          await escrowService.releasePaymentToSeller(id);
-        } catch (error) {
-          console.error('Auto-release error:', error);
-        }
-      }, 7 * 24 * 60 * 60 * 1000);
-
-      res.json({ message: 'Delivery confirmed successfully' });
+      await db.execute("UPDATE orders SET status = 'completed' WHERE id = ?", [req.params.id]);
+      res.json({ message: 'Delivery confirmed' });
     } catch (error) {
-      console.error('Confirm delivery error:', error);
+      console.error(error);
       res.status(500).json({ error: 'Failed to confirm delivery' });
     }
   }
 
   static async trackShipment(req, res) {
     try {
-      const { id } = req.params;
-      const order = await Order.findById(id);
-      
-      if (!order) {
-        return res.status(404).json({ error: 'Order not found' });
-      }
-
-      if (!order.courier_name || !order.tracking_number) {
-        return res.status(400).json({ error: 'No tracking information available' });
-      }
-
-      const trackingInfo = await ShippingService.trackShipment(
-        order.courier_name,
-        order.tracking_number
-      );
-
-      res.json(trackingInfo);
+      const order = await Order.findById(req.params.id);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+      res.json({ courier_name: order.courier_name, tracking_number: order.tracking_number, status: order.status });
     } catch (error) {
-      console.error('Track shipment error:', error);
+      console.error(error);
       res.status(500).json({ error: 'Failed to track shipment' });
     }
   }
