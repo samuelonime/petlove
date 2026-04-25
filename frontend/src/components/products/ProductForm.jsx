@@ -34,17 +34,79 @@ const ProductForm = ({ product = null, onSuccess }) => {
       e.price = "Price is required";
     else if (isNaN(parseFloat(price)) || parseFloat(price) <= 0)
       e.price = "Price must be greater than 0";
-    if (stock !== "" && stock !== null && stock !== undefined && (isNaN(parseInt(stock)) || parseInt(stock) < 0))
+    if (stock === "" || stock === null || stock === undefined)
+      e.stock = "Stock is required";
+    else if (isNaN(parseInt(stock)) || parseInt(stock) < 0)
       e.stock = "Stock must be 0 or more";
     return e;
   };
 
-  const handleImageUpload = (e) => {
+  // Compress image using Canvas if > 5MB
+  const compressImage = (file) => {
+    return new Promise((resolve) => {
+      const MAX_MB   = 5;
+      const MAX_SIZE = MAX_MB * 1024 * 1024;
+
+      // If under 5MB, use as-is
+      if (file.size <= MAX_SIZE) { resolve(file); return; }
+
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+
+        // Scale down until estimated size is under 5MB
+        let quality = 0.85;
+        let width   = img.width;
+        let height  = img.height;
+
+        // Reduce dimensions if very large
+        const MAX_DIM = 1920;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+          width  = Math.round(width  * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        const canvas  = document.createElement('canvas');
+        canvas.width  = width;
+        canvas.height = height;
+        const ctx     = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Try progressively lower quality until under 5MB
+        const tryCompress = (q) => {
+          canvas.toBlob((blob) => {
+            if (!blob) { resolve(file); return; }
+            if (blob.size <= MAX_SIZE || q <= 0.3) {
+              const compressed = new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() });
+              const savedMB = ((file.size - compressed.size) / (1024 * 1024)).toFixed(1);
+              toast.info(`Image compressed — saved ${savedMB}MB`, { autoClose: 2500 });
+              resolve(compressed);
+            } else {
+              tryCompress(q - 0.1);
+            }
+          }, 'image/jpeg', q);
+        };
+
+        tryCompress(quality);
+      };
+
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  };
+
+  const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (images.length + newImages.length + files.length > 5) {
       toast.error("Maximum 5 images allowed"); return;
     }
-    setNewImages(prev => [...prev, ...files.map(f => ({ file: f, preview: URL.createObjectURL(f) }))]);
+
+    // Compress each file if needed
+    const processed = await Promise.all(files.map(f => compressImage(f)));
+    setNewImages(prev => [...prev, ...processed.map(f => ({ file: f, preview: URL.createObjectURL(f) }))]);
   };
 
   const handleSubmit = async (e) => {
@@ -60,7 +122,7 @@ const ProductForm = ({ product = null, onSuccess }) => {
       fd.append("description", description.trim());
       fd.append("category",    category);
       fd.append("price",       String(parseFloat(price)));
-      fd.append("stock", stock !== "" && stock !== null ? String(parseInt(stock)) : "0");
+      fd.append("stock",       String(parseInt(stock)));
       fd.append("removedImages", JSON.stringify(removedImages));
       images.forEach(img => fd.append("existingImages[]", img));
       newImages.forEach(img => fd.append("images", img.file));
@@ -108,7 +170,7 @@ const ProductForm = ({ product = null, onSuccess }) => {
         </div>
 
         <div className="form-group">
-          <label className="form-label">Stock Quantity</label>
+          <label className="form-label">Stock Quantity *</label>
           <input type="number" value={stock} onChange={e => { setStock(e.target.value); setErrors(p => ({...p, stock: ""})); }}
             min="0" placeholder="e.g. 20"
             className={`form-input ${errors.stock ? "form-input-error" : ""}`} disabled={loading} />
