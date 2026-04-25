@@ -1,249 +1,246 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { formatCurrency } from '../utils/formatters';
+import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { FaArrowRight, FaLock } from 'react-icons/fa';
+import { toast } from 'react-toastify';
+import { FaLock, FaShoppingBag, FaArrowLeft, FaTruck, FaMoneyBillWave } from 'react-icons/fa';
 import './CheckoutPage.css';
 
 const CheckoutPage = () => {
   const { cartItems, cartTotal, clearCart } = useCart();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [shippingInfo, setShippingInfo] = useState({
-    name: '',
+  const [form, setForm] = useState({
+    name:    user?.name  || '',
+    email:   user?.email || '',
+    phone:   user?.phone || '',
     address: '',
-    city: '',
-    postalCode: '',
+    city:    '',
+    state:   '',
   });
-
-  useEffect(() => {
-    if (cartItems.length === 0) {
-      navigate('/cart');
-    }
-  }, [cartItems.length, navigate]);
+  const [errors,  setErrors]  = useState({});
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setShippingInfo(prev => ({ ...prev, [name]: value }));
+    setForm(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
+  };
+
+  const validate = () => {
+    const e = {};
+    if (!form.name.trim())    e.name    = 'Full name is required';
+    if (!form.email.trim())   e.email   = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Invalid email';
+    if (!form.phone.trim())   e.phone   = 'Phone number is required';
+    if (!form.address.trim()) e.address = 'Address is required';
+    if (!form.city.trim())    e.city    = 'City is required';
+    if (!form.state.trim())   e.state   = 'State is required';
+    return e;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
+    const errs = validate();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
 
     try {
-      // Map cart items to backend expected shape
+      setLoading(true);
+
       const items = cartItems.map(item => ({
         product_id: item.id,
-        quantity: item.quantity,
+        quantity:   item.quantity,
       }));
 
       const res = await api.post('/api/orders', {
         items,
-        delivery_option: 'standard',
-        express_shipping: false,
-        shipping_address: `${shippingInfo.address}, ${shippingInfo.city} ${shippingInfo.postalCode}`,
-        recipient_name: shippingInfo.name,
+        delivery_option:    'standard',
+        express_shipping:   false,
+        shipping_address:   `${form.address}, ${form.city}, ${form.state}`,
+        recipient_name:     form.name,
+        recipient_email:    form.email,
+        recipient_phone:    form.phone,
       });
 
-      // Backend returns { order, payment } or { order, paymentUrl }
-      const paymentUrl = res.data.paymentUrl || res.data.payment?.authorization_url;
+      const paymentUrl = res.data.payment_url || res.data.paymentUrl;
+
+      clearCart();
 
       if (paymentUrl) {
-        clearCart();
         window.location.href = paymentUrl;
       } else {
-        // No payment gateway configured — treat as cash on delivery
-        clearCart();
-        navigate(`/orders/${res.data.order?.id || res.data.orderId}`);
+        toast.success('Order placed successfully!');
+        navigate(`/orders/${res.data.order?.id}`);
       }
+
     } catch (err) {
-      setError(err.response?.data?.message || 'Checkout failed. Please try again.');
       console.error('Checkout error:', err);
+      toast.error(err.response?.data?.error || 'Checkout failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  if (cartItems.length === 0) return null;
+  const formatPrice = (n) => `₦${Number(n).toLocaleString('en-NG')}`;
+
+  if (!cartItems?.length) {
+    return (
+      <div className="checkout-empty">
+        <FaShoppingBag />
+        <p>Your cart is empty</p>
+        <button onClick={() => navigate('/products')}>Browse Products</button>
+      </div>
+    );
+  }
 
   return (
     <div className="checkout-page">
-      <div className="checkout-inner">
+      <div className="checkout-container">
 
-        {/* Header */}
-        <div className="checkout-header">
-          <h1>Checkout</h1>
-          <div className="checkout-breadcrumb">
-            <Link to="/products">Shop</Link>
-            <span className="checkout-breadcrumb-sep">›</span>
-            <Link to="/cart">Cart</Link>
-            <span className="checkout-breadcrumb-sep">›</span>
-            <span>Checkout</span>
-          </div>
+        {/* Left — Form */}
+        <div className="checkout-form-col">
+          <button className="checkout-back" onClick={() => navigate('/cart')}>
+            <FaArrowLeft /> Back to Cart
+          </button>
+          <h1 className="checkout-title">Checkout</h1>
+
+          <form onSubmit={handleSubmit} noValidate className="checkout-form">
+
+            {/* Contact */}
+            <div className="checkout-section">
+              <h2 className="checkout-section-title">Contact Information</h2>
+
+              <div className="cf-group">
+                <label className="cf-label">Full Name *</label>
+                <input name="name" value={form.name} onChange={handleChange}
+                  placeholder="e.g. Chidi Okonkwo"
+                  className={`cf-input ${errors.name ? 'cf-error' : ''}`} disabled={loading} />
+                {errors.name && <p className="cf-err-msg">{errors.name}</p>}
+              </div>
+
+              <div className="cf-row">
+                <div className="cf-group">
+                  <label className="cf-label">Email Address *</label>
+                  <input name="email" type="email" value={form.email} onChange={handleChange}
+                    placeholder="you@example.com"
+                    className={`cf-input ${errors.email ? 'cf-error' : ''}`} disabled={loading} />
+                  {errors.email && <p className="cf-err-msg">{errors.email}</p>}
+                </div>
+                <div className="cf-group">
+                  <label className="cf-label">Phone Number *</label>
+                  <input name="phone" type="tel" value={form.phone} onChange={handleChange}
+                    placeholder="e.g. 08012345678"
+                    className={`cf-input ${errors.phone ? 'cf-error' : ''}`} disabled={loading} />
+                  {errors.phone && <p className="cf-err-msg">{errors.phone}</p>}
+                </div>
+              </div>
+            </div>
+
+            {/* Delivery */}
+            <div className="checkout-section">
+              <h2 className="checkout-section-title">Delivery Address</h2>
+
+              <div className="cf-group">
+                <label className="cf-label">Street Address *</label>
+                <input name="address" value={form.address} onChange={handleChange}
+                  placeholder="e.g. 12 Wuse Zone 5"
+                  className={`cf-input ${errors.address ? 'cf-error' : ''}`} disabled={loading} />
+                {errors.address && <p className="cf-err-msg">{errors.address}</p>}
+              </div>
+
+              <div className="cf-row">
+                <div className="cf-group">
+                  <label className="cf-label">City *</label>
+                  <input name="city" value={form.city} onChange={handleChange}
+                    placeholder="e.g. Abuja"
+                    className={`cf-input ${errors.city ? 'cf-error' : ''}`} disabled={loading} />
+                  {errors.city && <p className="cf-err-msg">{errors.city}</p>}
+                </div>
+                <div className="cf-group">
+                  <label className="cf-label">State *</label>
+                  <input name="state" value={form.state} onChange={handleChange}
+                    placeholder="e.g. FCT"
+                    className={`cf-input ${errors.state ? 'cf-error' : ''}`} disabled={loading} />
+                  {errors.state && <p className="cf-err-msg">{errors.state}</p>}
+                </div>
+              </div>
+            </div>
+
+            {/* Payment method */}
+            <div className="checkout-section">
+              <h2 className="checkout-section-title">Payment Method</h2>
+              <div className="payment-method-card">
+                <FaMoneyBillWave className="pm-icon" />
+                <div>
+                  <p className="pm-title">Paystack (Card / Bank / USSD)</p>
+                  <p className="pm-sub">Secure payment via Paystack gateway</p>
+                </div>
+                <span className="pm-check">✓</span>
+              </div>
+            </div>
+
+            <button type="submit" className="checkout-submit" disabled={loading}>
+              {loading ? (
+                <><span className="checkout-spinner" /> Processing…</>
+              ) : (
+                <><FaLock /> Proceed to Payment — {formatPrice(cartTotal)}</>
+              )}
+            </button>
+
+            <p className="checkout-secure">
+              <FaLock /> Your payment is secured by Paystack
+            </p>
+
+          </form>
         </div>
 
-        <div className="checkout-layout">
+        {/* Right — Order summary */}
+        <div className="checkout-summary-col">
+          <div className="order-summary-card">
+            <h2 className="summary-title">Order Summary</h2>
 
-          {/* ── Left: Shipping Form ── */}
-          <div>
-            {error && (
-              <div className="checkout-error">
-                <span className="checkout-error-icon">⚠</span>
-                <span>{error}</span>
-              </div>
-            )}
-
-            <div className="co-card shipping-card">
-              <div className="shipping-card-header">
-                <span className="shipping-step-badge">1</span>
-                <h2>Shipping Information</h2>
-              </div>
-
-              <div className="shipping-form-body">
-                <form onSubmit={handleSubmit}>
-
-                  <div className="form-group">
-                    <label className="form-label">Full Name</label>
-                    <input
-                      type="text"
-                      name="name"
-                      className="form-input"
-                      placeholder="e.g. Chidi Okonkwo"
-                      value={shippingInfo.name}
-                      onChange={handleChange}
-                      required
-                      autoComplete="name"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Street Address</label>
-                    <input
-                      type="text"
-                      name="address"
-                      className="form-input"
-                      placeholder="e.g. 14 Adeola Odeku Street"
-                      value={shippingInfo.address}
-                      onChange={handleChange}
-                      required
-                      autoComplete="street-address"
-                    />
-                  </div>
-
-                  <div className="form-row">
-                    <div>
-                      <label className="form-label">City</label>
-                      <input
-                        type="text"
-                        name="city"
-                        className="form-input"
-                        placeholder="e.g. Lagos"
-                        value={shippingInfo.city}
-                        onChange={handleChange}
-                        required
-                        autoComplete="address-level2"
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label">Postal Code</label>
-                      <input
-                        type="text"
-                        name="postalCode"
-                        className="form-input"
-                        placeholder="e.g. 101001"
-                        value={shippingInfo.postalCode}
-                        onChange={handleChange}
-                        required
-                        autoComplete="postal-code"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="checkout-submit-btn"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <span className="btn-spinner" />
-                        Processing…
-                      </>
-                    ) : (
-                      <>
-                        Proceed to Payment
-                        <FaArrowRight className="btn-arrow" />
-                      </>
-                    )}
-                  </button>
-
-                  <div className="secure-strip">
-                    <FaLock className="secure-strip-icon" />
-                    Payments secured with 256-bit SSL encryption
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Right: Order Summary ── */}
-          <div className="co-card summary-card">
-            <div className="summary-card-header">
-              <span className="summary-step-badge">2</span>
-              <h2>Order Summary</h2>
-            </div>
-
-            {/* Item list */}
             <div className="summary-items">
               {cartItems.map(item => (
                 <div key={item.id} className="summary-item">
-                  <span className="summary-item-name">
-                    {item.name}
-                    <span className="summary-item-qty">×{item.quantity}</span>
-                  </span>
-                  <span className="summary-item-price">
-                    {formatCurrency(item.price * item.quantity)}
-                  </span>
+                  <div className="summary-item-img">
+                    {item.images?.[0]
+                      ? <img src={item.images[0]} alt={item.name} />
+                      : <div className="summary-item-placeholder">🐾</div>
+                    }
+                    <span className="summary-item-qty">{item.quantity}</span>
+                  </div>
+                  <div className="summary-item-info">
+                    <p className="summary-item-name">{item.name}</p>
+                    <p className="summary-item-price">{formatPrice(item.price)}</p>
+                  </div>
+                  <p className="summary-item-total">{formatPrice(item.price * item.quantity)}</p>
                 </div>
               ))}
             </div>
 
-            {/* Totals */}
             <div className="summary-totals">
               <div className="summary-row">
-                <span className="row-label">Subtotal</span>
-                <span className="row-value">{formatCurrency(cartTotal)}</span>
+                <span>Subtotal</span>
+                <span>{formatPrice(cartTotal)}</span>
               </div>
-              <div className="summary-row shipping">
-                <span className="row-label">Shipping</span>
-                <span className="row-value">Calculated at delivery</span>
+              <div className="summary-row">
+                <span><FaTruck /> Delivery</span>
+                <span className="free-delivery">Free</span>
               </div>
-              <div className="summary-divider" />
-              <div className="summary-row total-row">
-                <span className="row-label">Total</span>
-                <span className="row-value">{formatCurrency(cartTotal)}</span>
+              <div className="summary-row summary-total">
+                <span>Total</span>
+                <span>{formatPrice(cartTotal)}</span>
               </div>
             </div>
 
-            {/* Trust badges */}
-            <div className="summary-trust">
-              <div className="trust-row">
-                <span className="trust-dot" />
-                Secure payment with escrow protection
-              </div>
-              <div className="trust-row">
-                <span className="trust-dot" />
-                Money released only after confirmed delivery
-              </div>
+            <div className="summary-escrow">
+              🔒 Payment held in escrow until delivery confirmed
             </div>
           </div>
-
         </div>
+
       </div>
     </div>
   );
