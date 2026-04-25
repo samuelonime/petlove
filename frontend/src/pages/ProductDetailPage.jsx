@@ -1,248 +1,300 @@
-import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { FaShoppingCart, FaHeart, FaStar, FaTruck, FaShieldAlt, FaRedo, FaMinus, FaPlus } from 'react-icons/fa';
-import api from '../services/api';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 import { toast } from 'react-toastify';
+import {
+  FaShoppingCart, FaHeart, FaStar, FaStarHalfAlt, FaRegStar,
+  FaShieldAlt, FaTruck, FaUndo, FaHeadset,
+  FaChevronLeft, FaChevronRight, FaMinus, FaPlus, FaShare
+} from 'react-icons/fa';
 import './ProductDetailPage.css';
 
 const ProductDetailPage = () => {
   const { id } = useParams();
-  const [product, setProduct] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState(0);
-  const [quantity, setQuantity] = useState(1);
+  const navigate = useNavigate();
   const { addToCart } = useCart();
+  const { user } = useAuth();
+
+  const [product,    setProduct]    = useState(null);
+  const [reviews,    setReviews]    = useState([]);
+  const [rating,     setRating]     = useState(null);
+  const [loading,    setLoading]    = useState(true);
+  const [activeImg,  setActiveImg]  = useState(0);
+  const [quantity,   setQuantity]   = useState(1);
+  const [activeTab,  setActiveTab]  = useState('description');
+  const [wishlisted, setWishlisted] = useState(false);
 
   useEffect(() => {
-    const fetchProduct = async () => {
+    const fetch = async () => {
       try {
+        setLoading(true);
         const res = await api.get(`/api/products/${id}`);
         setProduct(res.data.product || res.data);
-      } catch (err) {
-        console.error('Error fetching product:', err);
+        setReviews(res.data.reviews || []);
+        setRating(res.data.rating  || null);
+      } catch {
+        toast.error('Failed to load product');
       } finally {
         setLoading(false);
       }
     };
-    fetchProduct();
+    fetch();
   }, [id]);
 
-  const handleQuantityChange = (type) => {
-    if (type === 'increment') {
-      setQuantity(prev => prev + 1);
-    } else if (type === 'decrement' && quantity > 1) {
-      setQuantity(prev => prev - 1);
-    }
-  };
+  const images = product?.images?.length ? product.images : [];
 
   const handleAddToCart = () => {
-    if (product && product.stock > 0) {
-      addToCart(product, quantity);
-      toast.success(`${product.name} added to cart!`);
-    }
+    if (!user) { toast.info('Please login to add items to cart'); navigate('/login'); return; }
+    addToCart({ ...product, quantity });
+    toast.success(`${product.name} added to cart!`);
   };
 
-  const handleWishlist = () => {
-    toast.info('Added to wishlist! (Feature coming soon)');
+  const handleBuyNow = () => {
+    handleAddToCart();
+    navigate('/checkout');
   };
+
+  const formatPrice = (n) => `₦${Number(n).toLocaleString('en-NG')}`;
+
+  const renderStars = (score) => {
+    const full = Math.floor(score || 0);
+    const half = (score || 0) - full >= 0.5;
+    return [1,2,3,4,5].map(i =>
+      i <= full ? <FaStar key={i} className="star star-full" /> :
+      i === full + 1 && half ? <FaStarHalfAlt key={i} className="star star-half" /> :
+      <FaRegStar key={i} className="star star-empty" />
+    );
+  };
+
+  const prevImg = () => setActiveImg(i => (i - 1 + images.length) % images.length);
+  const nextImg = () => setActiveImg(i => (i + 1) % images.length);
 
   if (loading) return (
-    <div className="loading-container">
-      <div className="loading-spinner"></div>
+    <div className="pdp-loading">
+      <div className="pdp-spinner" />
     </div>
   );
-  
+
   if (!product) return (
-    <div className="not-found">
-      <h2>Product Not Found</h2>
-      <p>The product you're looking for doesn't exist or has been removed.</p>
+    <div className="pdp-not-found">
+      <h2>Product not found</h2>
+      <button onClick={() => navigate('/products')}>Back to Products</button>
     </div>
   );
 
   return (
-    <div className="product-detail-page">
-      <div className="product-container">
-        <div className="product-detail-wrapper">
-          {/* Product Images Section */}
-          <div className="product-images">
-            <div className="main-image-container">
-              <img 
-                src={product.images?.[selectedImage] || '/default-product.jpg'} 
-                alt={product.name}
-                className="main-image"
-              />
-              <div className="image-navigation">
-                {product.images?.map((_, idx) => (
-                  <button
-                    key={idx}
-                    className={`nav-dot ${selectedImage === idx ? 'active' : ''}`}
-                    onClick={() => setSelectedImage(idx)}
-                    aria-label={`View image ${idx + 1}`}
-                  />
-                ))}
-              </div>
+    <div className="pdp-page">
+      {/* Breadcrumb */}
+      <div className="pdp-breadcrumb">
+        <span onClick={() => navigate('/')}>Home</span> /
+        <span onClick={() => navigate('/products')}>Products</span> /
+        <span onClick={() => navigate(`/products?category=${product.category}`)}>{product.category}</span> /
+        <span className="pdp-breadcrumb-current">{product.name}</span>
+      </div>
+
+      <div className="pdp-main">
+
+        {/* ── Images ── */}
+        <div className="pdp-gallery">
+          <div className="pdp-main-img-wrap">
+            {images.length > 0 ? (
+              <>
+                <img src={images[activeImg]} alt={product.name} className="pdp-main-img" />
+                {images.length > 1 && (
+                  <>
+                    <button className="pdp-img-nav pdp-img-prev" onClick={prevImg}><FaChevronLeft /></button>
+                    <button className="pdp-img-nav pdp-img-next" onClick={nextImg}><FaChevronRight /></button>
+                  </>
+                )}
+              </>
+            ) : (
+              <div className="pdp-no-image">🐾<p>No image</p></div>
+            )}
+            <button className="pdp-wishlist-btn" onClick={() => setWishlisted(w => !w)}>
+              <FaHeart className={wishlisted ? 'wishlisted' : ''} />
+            </button>
+          </div>
+
+          {images.length > 1 && (
+            <div className="pdp-thumbs">
+              {images.map((img, i) => (
+                <div key={i} className={`pdp-thumb ${activeImg === i ? 'active' : ''}`}
+                  onClick={() => setActiveImg(i)}>
+                  <img src={img} alt="" />
+                </div>
+              ))}
             </div>
-            
-            {product.images && product.images.length > 1 && (
-              <div className="thumbnail-container">
-                {product.images.map((img, idx) => (
-                  <div 
-                    key={idx}
-                    className={`thumbnail ${selectedImage === idx ? 'active' : ''}`}
-                    onClick={() => setSelectedImage(idx)}
-                  >
-                    <img src={img} alt={`${product.name} thumbnail ${idx + 1}`} />
-                  </div>
-                ))}
-              </div>
+          )}
+        </div>
+
+        {/* ── Info ── */}
+        <div className="pdp-info">
+
+          {/* Category badge */}
+          <span className="pdp-category">{product.category}</span>
+
+          {/* Title */}
+          <h1 className="pdp-title">{product.name}</h1>
+
+          {/* Rating */}
+          <div className="pdp-rating-row">
+            <div className="pdp-stars">{renderStars(rating?.average)}</div>
+            <span className="pdp-rating-score">{Number(rating?.average || 0).toFixed(1)}</span>
+            <span className="pdp-rating-count">({reviews.length} reviews)</span>
+            {product.seller_name && (
+              <span className="pdp-seller">By <strong>{product.seller_name}</strong></span>
             )}
           </div>
 
-          {/* Product Info Section */}
-          <div className="product-info">
-            <span className="category-badge">
-              {product.category || 'Pet Supplies'}
-            </span>
-            
-            <h1 className="product-title">{product.name}</h1>
-            
-            <p className="product-description">
-              {product.description || 'No description available.'}
-            </p>
+          {/* Price */}
+          <div className="pdp-price-row">
+            <span className="pdp-price">{formatPrice(product.price)}</span>
+            <span className="pdp-vat">VAT inclusive</span>
+          </div>
 
-            {/* Price Section */}
-            <div className="price-section">
-              <span className="current-price">₦{product.price?.toLocaleString('en-NG')}</span>
-              {product.originalPrice && (
-                <>
-                  <span className="original-price">${product.originalPrice.toFixed(2)}</span>
-                  {product.discountPercentage && (
-                    <span className="discount-badge">
-                      Save {product.discountPercentage}%
-                    </span>
-                  )}
-                </>
-              )}
-            </div>
+          {/* Stock indicator */}
+          <div className={`pdp-stock ${product.stock > 0 ? 'in-stock' : 'out-stock'}`}>
+            <span className="pdp-stock-dot" />
+            {product.stock > 0 ? 'In Stock' : 'Out of Stock'}
+          </div>
 
-            {/* Stock & Rating */}
-            <div className="stock-rating">
-              <div className={`stock-status ${product.stock > 0 ? 'in-stock' : 'out-of-stock'}`}>
-                <div className={`stock-dot ${product.stock > 0 ? 'in-stock' : 'out-of-stock'}`}></div>
-                
-              </div>
-              
-              {product.rating && (
-                <div className="product-rating">
-                  <div className="stars">
-                    {[...Array(5)].map((_, i) => (
-                      <FaStar 
-                        key={i} 
-                        className="star"
-                        style={{ opacity: i < Math.floor(product.rating) ? 1 : 0.3 }}
-                      />
-                    ))}
-                  </div>
-                  <span className="rating-count">({product.reviewCount || 0} reviews)</span>
-                </div>
-              )}
-            </div>
+          {/* Divider */}
+          <div className="pdp-divider" />
 
-            {/* Quantity Selector */}
-            <div className="quantity-section">
-              <label className="quantity-label">Quantity</label>
-              <div className="quantity-selector">
-                <button 
-                  className="quantity-btn"
-                  onClick={() => handleQuantityChange('decrement')}
-                  disabled={quantity <= 1}
-                >
-                  <FaMinus />
-                </button>
-                <input 
-                  type="number" 
-                  value={quantity}
-                  readOnly
-                  className="quantity-input"
-                  min="1"
-                  max={product.stock || 10}
-                />
-                <button 
-                  className="quantity-btn"
-                  onClick={() => handleQuantityChange('increment')}
-                  disabled={quantity >= (product.stock || 10)}
-                >
-                  <FaPlus />
-                </button>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="action-buttons">
-              <button 
-                className="primary-button"
-                onClick={handleAddToCart}
-                disabled={product.stock <= 0}
-              >
-                <FaShoppingCart />
-                {product.stock > 0 ? 'Add to Cart' : 'Unavailable'}
+          {/* Quantity */}
+          <div className="pdp-qty-row">
+            <span className="pdp-qty-label">Quantity</span>
+            <div className="pdp-qty-selector">
+              <button className="pdp-qty-btn" onClick={() => setQuantity(q => Math.max(1, q - 1))} disabled={quantity <= 1}>
+                <FaMinus />
               </button>
-              
-              <button 
-                className="secondary-button"
-                onClick={handleWishlist}
-              >
-                <FaHeart />
-                Add to Wishlist
+              <span className="pdp-qty-val">{quantity}</span>
+              <button className="pdp-qty-btn" onClick={() => setQuantity(q => Math.min(product.stock || 99, q + 1))} disabled={quantity >= (product.stock || 99)}>
+                <FaPlus />
               </button>
-            </div>
-
-            {/* Additional Info */}
-            <div className="additional-info">
-              <div className="info-grid">
-                <div className="info-item">
-                  <div className="info-icon">
-                    <FaTruck />
-                  </div>
-                  <div className="info-text">
-                    <span className="info-label">Delivery</span>
-                    <span className="info-value">Free shipping over $50</span>
-                  </div>
-                </div>
-                
-                <div className="info-item">
-                  <div className="info-icon">
-                    <FaShieldAlt />
-                  </div>
-                  <div className="info-text">
-                    <span className="info-label">Warranty</span>
-                    <span className="info-value">30-day return policy</span>
-                  </div>
-                </div>
-                
-                <div className="info-item">
-                  <div className="info-icon">
-                    <FaRedo />
-                  </div>
-                  <div className="info-text">
-                    <span className="info-label">Returns</span>
-                    <span className="info-value">Easy returns</span>
-                  </div>
-                </div>
-                
-                <div className="info-item">
-                  <div className="info-icon">
-                    <FaTruck />
-                  </div>
-                  <div className="info-text">
-                    <span className="info-label">Estimated Delivery</span>
-                    <span className="info-value">2-5 business days</span>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
+
+          {/* Action buttons */}
+          <div className="pdp-actions">
+            <button className="pdp-btn-cart" onClick={handleAddToCart} disabled={!product.stock}>
+              <FaShoppingCart /> Add to Cart
+            </button>
+            <button className="pdp-btn-buy" onClick={handleBuyNow} disabled={!product.stock}>
+              Buy Now
+            </button>
+          </div>
+
+          <button className="pdp-share-btn" onClick={() => { navigator.clipboard?.writeText(window.location.href); toast.success('Link copied!'); }}>
+            <FaShare /> Share
+          </button>
+
+          {/* Guarantees */}
+          <div className="pdp-guarantees">
+            {[
+              { icon: <FaShieldAlt />, title: 'Secure Payment',   sub: 'Escrow protection' },
+              { icon: <FaTruck />,     title: 'Fast Delivery',     sub: 'Nationwide' },
+              { icon: <FaUndo />,      title: 'Easy Returns',      sub: '7-day policy' },
+              { icon: <FaHeadset />,   title: '24/7 Support',      sub: 'Always here' },
+            ].map(g => (
+              <div key={g.title} className="pdp-guarantee">
+                <span className="pdp-guarantee-icon">{g.icon}</span>
+                <div>
+                  <p className="pdp-guarantee-title">{g.title}</p>
+                  <p className="pdp-guarantee-sub">{g.sub}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Tabs ── */}
+      <div className="pdp-tabs-section">
+        <div className="pdp-tabs">
+          {['description', 'reviews', 'shipping'].map(tab => (
+            <button key={tab} className={`pdp-tab ${activeTab === tab ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab)}>
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === 'reviews' && ` (${reviews.length})`}
+            </button>
+          ))}
+        </div>
+
+        <div className="pdp-tab-content">
+          {activeTab === 'description' && (
+            <div className="pdp-description">
+              {product.description
+                ? <p>{product.description}</p>
+                : <p className="pdp-no-content">No description available.</p>
+              }
+              <div className="pdp-specs">
+                <h3>Product Details</h3>
+                <table className="pdp-specs-table">
+                  <tbody>
+                    <tr><td>Category</td><td>{product.category}</td></tr>
+                    <tr><td>Price</td><td>{formatPrice(product.price)}</td></tr>
+                    {product.seller_name && <tr><td>Seller</td><td>{product.seller_name}</td></tr>}
+                    <tr><td>Listed</td><td>{new Date(product.created_at).toLocaleDateString('en-NG', { year:'numeric', month:'long', day:'numeric' })}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'reviews' && (
+            <div className="pdp-reviews">
+              {reviews.length > 0 ? (
+                <>
+                  <div className="pdp-review-summary">
+                    <div className="pdp-review-big-score">{Number(rating?.average || 0).toFixed(1)}</div>
+                    <div>
+                      <div className="pdp-stars">{renderStars(rating?.average)}</div>
+                      <p className="pdp-review-total">{reviews.length} verified review{reviews.length !== 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+                  <div className="pdp-review-list">
+                    {reviews.map((r, i) => (
+                      <div key={i} className="pdp-review-card">
+                        <div className="pdp-review-header">
+                          <div className="pdp-reviewer-avatar">{(r.user_name || r.name || 'U').charAt(0).toUpperCase()}</div>
+                          <div>
+                            <p className="pdp-reviewer-name">{r.user_name || r.name || 'Anonymous'}</p>
+                            <div className="pdp-stars pdp-stars-sm">{renderStars(r.rating)}</div>
+                          </div>
+                          <span className="pdp-review-date">{new Date(r.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <p className="pdp-review-text">{r.comment || r.review}</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="pdp-no-content">No reviews yet. Be the first to review this product!</p>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'shipping' && (
+            <div className="pdp-shipping-info">
+              {[
+                { icon: '🚚', title: 'Standard Delivery', detail: 'Delivered within 3-7 business days nationwide' },
+                { icon: '⚡', title: 'Express Delivery',  detail: 'Same day or next day delivery (extra ₦2,000)' },
+                { icon: '🔒', title: 'Escrow Protection', detail: 'Payment held safely until you confirm delivery' },
+                { icon: '↩️', title: 'Return Policy',     detail: 'Return within 7 days if item is not as described' },
+              ].map(s => (
+                <div key={s.title} className="pdp-shipping-card">
+                  <span className="pdp-shipping-icon">{s.icon}</span>
+                  <div>
+                    <p className="pdp-shipping-title">{s.title}</p>
+                    <p className="pdp-shipping-detail">{s.detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
